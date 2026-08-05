@@ -29,11 +29,14 @@ The first vertical slice includes:
 - Configurable task profiles seeded in the database.
 - Execution run ingestion.
 - Idempotency support.
+- Deterministic scoring analysis.
+- Findings and recommendations.
+- Estimated cost reduction.
 - Request validation and consistent API errors.
 - OpenAPI documentation.
 - Docker-based local setup.
 
-Frontend, scoring analysis, findings, recommendations, simulator, and comparison screens will follow after this backend slice is stable.
+Frontend, simulator, comparison screens, SDK ingestion, and adaptive baselines will follow after this backend slice is stable.
 
 ## Current API
 
@@ -48,6 +51,8 @@ Endpoints:
 ```text
 POST /api/v1/runs
 GET  /api/v1/runs/{runId}
+POST /api/v1/runs/{runId}/analysis
+GET  /api/v1/runs/{runId}/analysis
 GET  /api/v1/task-profiles
 GET  /actuator/health
 ```
@@ -148,9 +153,9 @@ localhost:5432
 
 ## Roadmap
 
-1. Add deterministic scoring and balance score classifications.
-2. Generate findings and recommendations.
-3. Add analysis endpoints.
-4. Add simulator with demo scenarios.
-5. Build React dashboard and comparison views.
+1. Add simulator with demo scenarios.
+2. Build React dashboard and comparison views.
+3. Add SDK-based ingestion for agent executions.
+4. Add input-size-aware task profile budgets.
+5. Add historical baselines and team-level reporting.
 6. Add observability metrics for run and analysis quality.

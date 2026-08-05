@@ -26,3 +26,14 @@ springdoc:
 
 server:
   port: 8080
+
+meden:
+  scoring:
+    cost-weight: 0.25
+    token-weight: 0.20
+    tool-weight: 0.15
+    model-call-weight: 0.15
+    latency-weight: 0.10
+    retry-weight: 0.10
+    autonomy-weight: 0.05
+    insufficient-execution-token-ratio: 0.25

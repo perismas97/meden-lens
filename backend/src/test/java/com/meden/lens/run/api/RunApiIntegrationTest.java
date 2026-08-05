@@ -1,5 +1,7 @@
 package com.meden.lens.run.api;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -41,6 +43,9 @@ class RunApiIntegrationTest {
 
     @Autowired
     TestRestTemplate restTemplate;
+
+    @Autowired
+    ObjectMapper objectMapper;
 
     @Test
     void listsSeededTaskProfiles() {
@@ -99,6 +104,54 @@ class RunApiIntegrationTest {
         assertThat(response.getBody()).contains("VALIDATION_ERROR", "execution.completedAt");
     }
 
+    @Test
+    void analyzesRunAndReturnsExplainableDecision() throws Exception {
+        ResponseEntity<String> created = restTemplate.exchange(
+            url("/api/v1/runs"),
+            HttpMethod.POST,
+            jsonEntity(excessiveRunJson("document-summary-analysis-it-001")),
+            String.class
+        );
+        assertThat(created.getStatusCode()).isEqualTo(HttpStatus.CREATED);
+
+        JsonNode createdBody = objectMapper.readTree(created.getBody());
+        String runId = createdBody.get("id").asText();
+
+        ResponseEntity<String> analyzed = restTemplate.exchange(
+            url("/api/v1/runs/" + runId + "/analysis"),
+            HttpMethod.POST,
+            HttpEntity.EMPTY,
+            String.class
+        );
+        ResponseEntity<String> duplicateAnalysis = restTemplate.exchange(
+            url("/api/v1/runs/" + runId + "/analysis"),
+            HttpMethod.POST,
+            HttpEntity.EMPTY,
+            String.class
+        );
+        ResponseEntity<String> fetched = restTemplate.getForEntity(
+            url("/api/v1/runs/" + runId + "/analysis"),
+            String.class
+        );
+
+        assertThat(analyzed.getStatusCode()).isEqualTo(HttpStatus.CREATED);
+        assertThat(analyzed.getBody())
+            .contains(
+                "\"runId\":\"" + runId + "\"",
+                "\"balanceScore\":16",
+                "\"classification\":\"HIGHLY_DISPROPORTIONATE\"",
+                "\"TOKEN_BUDGET_EXCEEDED\"",
+                "\"COST_DISPROPORTIONATE_TO_TASK\"",
+                "\"REDUCE_MODEL_CALLS\"",
+                "\"estimatedCostReductionUsd\":1.5900",
+                "\"estimatedSavingsPercent\":86.41"
+            );
+        assertThat(duplicateAnalysis.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(duplicateAnalysis.getBody()).contains("\"runId\":\"" + runId + "\"");
+        assertThat(fetched.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(fetched.getBody()).contains("\"runId\":\"" + runId + "\"");
+    }
+
     private HttpEntity<String> jsonEntity(String json) {
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
@@ -147,6 +200,60 @@ class RunApiIntegrationTest {
                 }
               ],
               "tools": [],
+              "metadata": {
+                "environment": "local",
+                "team": "demo",
+                "purpose": "technical-document-summary"
+              }
+            }
+            """.formatted(idempotencyKey);
+    }
+
+    private String excessiveRunJson(String idempotencyKey) {
+        return """
+            {
+              "externalRunId": "run-external-analysis-001",
+              "idempotencyKey": "%s",
+              "agent": {
+                "name": "support-document-agent",
+                "version": "1.0.0"
+              },
+              "task": {
+                "type": "DOCUMENT_SUMMARY",
+                "description": "Summarize a 15-page technical support document",
+                "complexity": "MEDIUM"
+              },
+              "execution": {
+                "status": "SUCCESS",
+                "startedAt": "2026-08-05T08:00:00Z",
+                "completedAt": "2026-08-05T08:00:42Z",
+                "durationMs": 42000,
+                "modelCalls": 6,
+                "toolCalls": 12,
+                "retryCount": 2,
+                "subAgentCount": 0,
+                "inputTokens": 48000,
+                "outputTokens": 9000,
+                "estimatedCostUsd": 1.84
+              },
+              "models": [
+                {
+                  "provider": "sample-provider",
+                  "model": "large-reasoning-model",
+                  "callCount": 6,
+                  "inputTokens": 48000,
+                  "outputTokens": 9000,
+                  "estimatedCostUsd": 1.84
+                }
+              ],
+              "tools": [
+                {
+                  "name": "web-search",
+                  "callCount": 12,
+                  "successCount": 12,
+                  "failureCount": 0
+                }
+              ],
               "metadata": {
                 "environment": "local",
                 "team": "demo",
