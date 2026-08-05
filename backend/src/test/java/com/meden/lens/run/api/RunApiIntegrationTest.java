@@ -24,7 +24,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 class RunApiIntegrationTest {
 
     @Container
-    static final PostgreSQLContainer<?> POSTGRES = new PostgreSQLContainer<>("postgres:16-alpine")
+    static final PostgreSQLContainer POSTGRES = new PostgreSQLContainer("postgres:16-alpine")
         .withDatabaseName("meden_lens_test")
         .withUsername("meden")
         .withPassword("meden");
