@@ -1,0 +1,28 @@
+spring:
+  application:
+    name: meden-lens
+  datasource:
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/meden_lens}
+    username: ${SPRING_DATASOURCE_USERNAME:meden}
+    password: ${SPRING_DATASOURCE_PASSWORD:meden}
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    open-in-view: false
+  flyway:
+    enabled: true
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
+
+springdoc:
+  api-docs:
+    path: /api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+
+server:
+  port: 8080
