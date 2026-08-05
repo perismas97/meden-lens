@@ -72,6 +72,8 @@ Run unit and integration tests. This requires Docker Desktop to be running becau
 mvn -f backend/pom.xml verify
 ```
 
+The project uses Testcontainers 2.x so integration tests work with recent Docker Desktop versions that require newer Docker API clients.
+
 With Docker:
 
 ```bash
