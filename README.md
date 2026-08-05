@@ -60,6 +60,18 @@ http://localhost:8080/swagger-ui/index.html
 
 ## Run Locally
 
+Run unit tests:
+
+```bash
+mvn -f backend/pom.xml test
+```
+
+Run unit and integration tests. This requires Docker Desktop to be running because integration tests use Testcontainers:
+
+```bash
+mvn -f backend/pom.xml verify
+```
+
 With Docker:
 
 ```bash
