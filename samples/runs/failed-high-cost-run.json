@@ -1,0 +1,55 @@
+{
+  "externalRunId": "sample-failed-high-cost-run",
+  "idempotencyKey": "sample-failed-high-cost-run",
+  "agent": {
+    "name": "support-document-agent",
+    "version": "1.0.0"
+  },
+  "task": {
+    "type": "DOCUMENT_SUMMARY",
+    "description": "Summarize a technical support document but fail after retries",
+    "complexity": "MEDIUM"
+  },
+  "execution": {
+    "status": "FAILED",
+    "startedAt": "2026-08-07T08:00:00Z",
+    "completedAt": "2026-08-07T08:01:00Z",
+    "durationMs": 60000,
+    "modelCalls": 4,
+    "toolCalls": 3,
+    "retryCount": 3,
+    "subAgentCount": 0,
+    "inputTokens": 16000,
+    "outputTokens": 4000,
+    "estimatedCostUsd": 0.9500
+  },
+  "models": [
+    {
+      "provider": "sample-provider",
+      "model": "large-reasoning-model",
+      "callCount": 4,
+      "inputTokens": 16000,
+      "outputTokens": 4000,
+      "estimatedCostUsd": 0.9500
+    }
+  ],
+  "tools": [
+    {
+      "name": "document-reader",
+      "callCount": 2,
+      "successCount": 1,
+      "failureCount": 1
+    },
+    {
+      "name": "web-search",
+      "callCount": 1,
+      "successCount": 0,
+      "failureCount": 1
+    }
+  ],
+  "metadata": {
+    "environment": "local",
+    "team": "demo",
+    "purpose": "sample-failed-expensive-run"
+  }
+}

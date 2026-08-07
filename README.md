@@ -63,6 +63,12 @@ Swagger UI:
 http://localhost:8080/swagger-ui/index.html
 ```
 
+## Example Scenarios
+
+Ready-to-run sample payloads live in [`samples/runs`](samples/runs).
+
+See [`docs/examples.md`](docs/examples.md) for PowerShell commands that create a run, analyze it, and fetch the stored analysis.
+
 ## Run Locally
 
 Run unit tests:
@@ -138,8 +144,8 @@ localhost:5432
   "tools": [
     {
       "name": "web-search",
-      "callCount": 10,
-      "successCount": 10,
+      "callCount": 12,
+      "successCount": 12,
       "failureCount": 0
     }
   ],

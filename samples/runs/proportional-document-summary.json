@@ -1,0 +1,49 @@
+{
+  "externalRunId": "sample-proportional-document-summary",
+  "idempotencyKey": "sample-proportional-document-summary",
+  "agent": {
+    "name": "support-document-agent",
+    "version": "1.0.0"
+  },
+  "task": {
+    "type": "DOCUMENT_SUMMARY",
+    "description": "Summarize a 15-page technical support document",
+    "complexity": "MEDIUM"
+  },
+  "execution": {
+    "status": "SUCCESS",
+    "startedAt": "2026-08-07T08:00:00Z",
+    "completedAt": "2026-08-07T08:00:15Z",
+    "durationMs": 15000,
+    "modelCalls": 1,
+    "toolCalls": 1,
+    "retryCount": 0,
+    "subAgentCount": 0,
+    "inputTokens": 10000,
+    "outputTokens": 2500,
+    "estimatedCostUsd": 0.1800
+  },
+  "models": [
+    {
+      "provider": "sample-provider",
+      "model": "efficient-summary-model",
+      "callCount": 1,
+      "inputTokens": 10000,
+      "outputTokens": 2500,
+      "estimatedCostUsd": 0.1800
+    }
+  ],
+  "tools": [
+    {
+      "name": "document-reader",
+      "callCount": 1,
+      "successCount": 1,
+      "failureCount": 0
+    }
+  ],
+  "metadata": {
+    "environment": "local",
+    "team": "demo",
+    "purpose": "sample-proportional-run"
+  }
+}

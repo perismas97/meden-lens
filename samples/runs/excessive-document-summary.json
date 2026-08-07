@@ -1,0 +1,49 @@
+{
+  "externalRunId": "sample-excessive-document-summary",
+  "idempotencyKey": "sample-excessive-document-summary",
+  "agent": {
+    "name": "support-document-agent",
+    "version": "1.0.0"
+  },
+  "task": {
+    "type": "DOCUMENT_SUMMARY",
+    "description": "Summarize a 15-page technical support document",
+    "complexity": "MEDIUM"
+  },
+  "execution": {
+    "status": "SUCCESS",
+    "startedAt": "2026-08-07T08:00:00Z",
+    "completedAt": "2026-08-07T08:00:42Z",
+    "durationMs": 42000,
+    "modelCalls": 6,
+    "toolCalls": 12,
+    "retryCount": 2,
+    "subAgentCount": 0,
+    "inputTokens": 48000,
+    "outputTokens": 9000,
+    "estimatedCostUsd": 1.8400
+  },
+  "models": [
+    {
+      "provider": "sample-provider",
+      "model": "large-reasoning-model",
+      "callCount": 6,
+      "inputTokens": 48000,
+      "outputTokens": 9000,
+      "estimatedCostUsd": 1.8400
+    }
+  ],
+  "tools": [
+    {
+      "name": "web-search",
+      "callCount": 12,
+      "successCount": 12,
+      "failureCount": 0
+    }
+  ],
+  "metadata": {
+    "environment": "local",
+    "team": "demo",
+    "purpose": "sample-excessive-run"
+  }
+}

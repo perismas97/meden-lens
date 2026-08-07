@@ -1,0 +1,55 @@
+{
+  "externalRunId": "sample-valid-deep-research",
+  "idempotencyKey": "sample-valid-deep-research",
+  "agent": {
+    "name": "research-agent",
+    "version": "1.0.0"
+  },
+  "task": {
+    "type": "DEEP_RESEARCH",
+    "description": "Research a technical market and produce a structured report",
+    "complexity": "HIGH"
+  },
+  "execution": {
+    "status": "SUCCESS",
+    "startedAt": "2026-08-07T08:00:00Z",
+    "completedAt": "2026-08-07T08:02:30Z",
+    "durationMs": 150000,
+    "modelCalls": 8,
+    "toolCalls": 24,
+    "retryCount": 2,
+    "subAgentCount": 2,
+    "inputTokens": 72000,
+    "outputTokens": 18000,
+    "estimatedCostUsd": 2.5000
+  },
+  "models": [
+    {
+      "provider": "sample-provider",
+      "model": "large-research-model",
+      "callCount": 8,
+      "inputTokens": 72000,
+      "outputTokens": 18000,
+      "estimatedCostUsd": 2.5000
+    }
+  ],
+  "tools": [
+    {
+      "name": "web-search",
+      "callCount": 18,
+      "successCount": 18,
+      "failureCount": 0
+    },
+    {
+      "name": "document-reader",
+      "callCount": 6,
+      "successCount": 6,
+      "failureCount": 0
+    }
+  ],
+  "metadata": {
+    "environment": "local",
+    "team": "demo",
+    "purpose": "sample-valid-deep-research"
+  }
+}
