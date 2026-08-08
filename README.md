@@ -69,6 +69,12 @@ Ready-to-run sample payloads live in [`samples/runs`](samples/runs).
 
 See [`docs/examples.md`](docs/examples.md) for PowerShell commands that create a run, analyze it, and fetch the stored analysis.
 
+## Design Notes
+
+Meden Lens intentionally starts with deterministic, explainable scoring. The system compares actual execution metrics against configured task profiles, then returns a balance score, classification, findings, recommendations, and estimated savings.
+
+See [`docs/design-notes.md`](docs/design-notes.md) for the main product and architecture decisions behind the MVP.
+
 ## Run Locally
 
 Run unit tests:
