@@ -1,5 +1,7 @@
 # Meden Lens
 
+[![Backend CI](https://github.com/perismas97/meden-lens/actions/workflows/backend-ci.yml/badge.svg)](https://github.com/perismas97/meden-lens/actions/workflows/backend-ci.yml)
+
 Goal-aware efficiency analysis for AI agents.
 
 Meden Lens is an explainable AI agent efficiency analyzer inspired by the Delphic maxim "Μηδέν άγαν" - nothing in excess. It evaluates whether the cost, tokens, tools, latency, retries, and autonomy used by an AI agent are proportional to the task being performed.
