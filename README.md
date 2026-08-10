@@ -37,8 +37,9 @@ The first vertical slice includes:
 - Request validation and consistent API errors.
 - OpenAPI documentation.
 - Docker-based local setup.
+- Simulator endpoints for built-in demo scenarios.
 
-Frontend, simulator, comparison screens, SDK ingestion, and adaptive baselines will follow after this backend slice is stable.
+Frontend, comparison screens, SDK ingestion, and adaptive baselines will follow after this backend slice is stable.
 
 ## Current API
 
@@ -56,6 +57,8 @@ GET  /api/v1/runs/{runId}
 POST /api/v1/runs/{runId}/analysis
 GET  /api/v1/runs/{runId}/analysis
 GET  /api/v1/task-profiles
+GET  /api/v1/simulator/scenarios
+POST /api/v1/simulator/scenarios/{scenarioKey}
 GET  /actuator/health
 ```
 
@@ -70,6 +73,8 @@ http://localhost:8080/swagger-ui/index.html
 Ready-to-run sample payloads live in [`samples/runs`](samples/runs).
 
 See [`docs/examples.md`](docs/examples.md) for PowerShell commands that create a run, analyze it, and fetch the stored analysis.
+
+The backend also includes simulator endpoints for creating and analyzing the same scenario types directly from the API.
 
 ## Design Notes
 
@@ -167,9 +172,8 @@ localhost:5432
 
 ## Roadmap
 
-1. Add simulator with demo scenarios.
-2. Build React dashboard and comparison views.
-3. Add SDK-based ingestion for agent executions.
-4. Add input-size-aware task profile budgets.
-5. Add historical baselines and team-level reporting.
-6. Add observability metrics for run and analysis quality.
+1. Build React dashboard and comparison views.
+2. Add SDK-based ingestion for agent executions.
+3. Add input-size-aware task profile budgets.
+4. Add historical baselines and team-level reporting.
+5. Add observability metrics for run and analysis quality.

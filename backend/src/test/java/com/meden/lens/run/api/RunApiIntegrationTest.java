@@ -152,6 +152,40 @@ class RunApiIntegrationTest {
         assertThat(fetched.getBody()).contains("\"runId\":\"" + runId + "\"");
     }
 
+    @Test
+    void simulatesScenarioAndReturnsAnalyzedRun() {
+        ResponseEntity<String> scenarios = restTemplate.getForEntity(
+            url("/api/v1/simulator/scenarios"),
+            String.class
+        );
+        ResponseEntity<String> simulated = restTemplate.exchange(
+            url("/api/v1/simulator/scenarios/excessive-document-summary"),
+            HttpMethod.POST,
+            HttpEntity.EMPTY,
+            String.class
+        );
+
+        assertThat(scenarios.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(scenarios.getBody())
+            .contains(
+                "proportional-document-summary",
+                "excessive-document-summary",
+                "failed-high-cost-run",
+                "valid-deep-research"
+            );
+
+        assertThat(simulated.getStatusCode()).isEqualTo(HttpStatus.CREATED);
+        assertThat(simulated.getBody())
+            .contains(
+                "\"scenarioKey\":\"excessive-document-summary\"",
+                "\"runCreated\":true",
+                "\"analysisCreated\":true",
+                "\"classification\":\"HIGHLY_DISPROPORTIONATE\"",
+                "\"TOKEN_BUDGET_EXCEEDED\"",
+                "\"estimatedCostReductionUsd\":1.5900"
+            );
+    }
+
     private HttpEntity<String> jsonEntity(String json) {
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);

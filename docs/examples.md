@@ -52,3 +52,25 @@ The sample files use fixed idempotency keys. If you run the same sample more tha
 The excessive document summary should return a low `balanceScore`, a `HIGHLY_DISPROPORTIONATE` classification, multiple findings, and estimated cost reduction.
 
 The proportional document summary and valid deep research examples should show why Meden Lens compares a run against the declared task profile instead of judging raw cost or token usage in isolation.
+
+## Use The Simulator API
+
+The backend can also create and analyze built-in scenarios without manual JSON payloads.
+
+List available scenarios:
+
+```powershell
+Invoke-RestMethod `
+  -Method Get `
+  -Uri "http://localhost:8080/api/v1/simulator/scenarios" |
+  ConvertTo-Json -Depth 10
+```
+
+Create and analyze the excessive document summary scenario:
+
+```powershell
+Invoke-RestMethod `
+  -Method Post `
+  -Uri "http://localhost:8080/api/v1/simulator/scenarios/excessive-document-summary" |
+  ConvertTo-Json -Depth 10
+```
