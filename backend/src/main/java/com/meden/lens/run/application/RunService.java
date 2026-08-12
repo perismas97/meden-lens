@@ -3,10 +3,12 @@ package com.meden.lens.run.application;
 import com.meden.lens.run.api.CreateRunRequest;
 import com.meden.lens.run.api.RunResponse;
 import com.meden.lens.run.domain.ExecutionRunEntity;
+import com.meden.lens.run.domain.ExecutionStatus;
 import com.meden.lens.run.infrastructure.ExecutionRunRepository;
 import com.meden.lens.shared.errors.ApiValidationException;
 import com.meden.lens.shared.errors.FieldErrorDetail;
 import com.meden.lens.shared.errors.ResourceNotFoundException;
+import com.meden.lens.taskprofile.domain.TaskType;
 import com.meden.lens.taskprofile.infrastructure.TaskProfileRepository;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
@@ -52,6 +54,16 @@ public class RunService {
         return runRepository.findById(runId)
             .map(run -> mapper.toResponse(run, false))
             .orElseThrow(() -> new ResourceNotFoundException("Execution run was not found."));
+    }
+
+    @Transactional(readOnly = true)
+    public List<RunResponse> listRuns(TaskType taskType, ExecutionStatus status, String team) {
+        String normalizedTeam = team == null || team.isBlank() ? null : team.trim();
+
+        return runRepository.findRuns(taskType, status, normalizedTeam)
+            .stream()
+            .map(run -> mapper.toResponse(run, false))
+            .toList();
     }
 
     private RunResponse createNewRun(CreateRunRequest request, String idempotencyKey) {

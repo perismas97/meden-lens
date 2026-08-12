@@ -186,6 +186,46 @@ class RunApiIntegrationTest {
             );
     }
 
+    @Test
+    void listsRunsWithOptionalFilters() {
+        ResponseEntity<String> failedScenario = restTemplate.exchange(
+            url("/api/v1/simulator/scenarios/failed-high-cost-run"),
+            HttpMethod.POST,
+            HttpEntity.EMPTY,
+            String.class
+        );
+        ResponseEntity<String> deepResearchScenario = restTemplate.exchange(
+            url("/api/v1/simulator/scenarios/valid-deep-research"),
+            HttpMethod.POST,
+            HttpEntity.EMPTY,
+            String.class
+        );
+
+        ResponseEntity<String> allRuns = restTemplate.getForEntity(url("/api/v1/runs"), String.class);
+        ResponseEntity<String> failedRuns = restTemplate.getForEntity(url("/api/v1/runs?status=FAILED"), String.class);
+        ResponseEntity<String> deepResearchRuns = restTemplate.getForEntity(
+            url("/api/v1/runs?taskType=DEEP_RESEARCH&team=demo"),
+            String.class
+        );
+
+        assertThat(failedScenario.getStatusCode()).isEqualTo(HttpStatus.CREATED);
+        assertThat(deepResearchScenario.getStatusCode()).isEqualTo(HttpStatus.CREATED);
+
+        assertThat(allRuns.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(allRuns.getBody())
+            .contains("sample-failed-expensive-run", "sample-valid-deep-research");
+
+        assertThat(failedRuns.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(failedRuns.getBody())
+            .contains("\"status\":\"FAILED\"", "sample-failed-expensive-run")
+            .doesNotContain("\"status\":\"SUCCESS\"");
+
+        assertThat(deepResearchRuns.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(deepResearchRuns.getBody())
+            .contains("\"type\":\"DEEP_RESEARCH\"", "sample-valid-deep-research")
+            .doesNotContain("\"type\":\"DOCUMENT_SUMMARY\"");
+    }
+
     private HttpEntity<String> jsonEntity(String json) {
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);

@@ -53,6 +53,7 @@ Endpoints:
 
 ```text
 POST /api/v1/runs
+GET  /api/v1/runs?taskType=&status=&team=
 GET  /api/v1/runs/{runId}
 POST /api/v1/runs/{runId}/analysis
 GET  /api/v1/runs/{runId}/analysis
@@ -75,6 +76,12 @@ Ready-to-run sample payloads live in [`samples/runs`](samples/runs).
 See [`docs/examples.md`](docs/examples.md) for PowerShell commands that create a run, analyze it, and fetch the stored analysis.
 
 The backend also includes simulator endpoints for creating and analyzing the same scenario types directly from the API.
+
+Stored runs can be listed for dashboard-style views:
+
+```powershell
+Invoke-RestMethod -Method Get -Uri "http://localhost:8080/api/v1/runs?status=FAILED"
+```
 
 ## Design Notes
 
