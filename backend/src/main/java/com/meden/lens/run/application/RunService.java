@@ -10,11 +10,16 @@ import com.meden.lens.shared.errors.FieldErrorDetail;
 import com.meden.lens.shared.errors.ResourceNotFoundException;
 import com.meden.lens.taskprofile.domain.TaskType;
 import com.meden.lens.taskprofile.infrastructure.TaskProfileRepository;
+import jakarta.persistence.criteria.Predicate;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import java.util.UUID;
 
 @Service
@@ -60,10 +65,42 @@ public class RunService {
     public List<RunResponse> listRuns(TaskType taskType, ExecutionStatus status, String team) {
         String normalizedTeam = team == null || team.isBlank() ? null : team.trim();
 
-        return runRepository.findRuns(taskType, status, normalizedTeam)
+        return runRepository.findAll(
+                matchesFilters(taskType, status, normalizedTeam),
+                Sort.by(Sort.Direction.DESC, "createdAt")
+            )
             .stream()
             .map(run -> mapper.toResponse(run, false))
             .toList();
+    }
+
+    private Specification<ExecutionRunEntity> matchesFilters(
+        TaskType taskType,
+        ExecutionStatus status,
+        String team
+    ) {
+        return (root, query, criteriaBuilder) -> {
+            List<Predicate> predicates = new ArrayList<>();
+
+            if (taskType != null) {
+                predicates.add(criteriaBuilder.equal(root.get("taskType"), taskType));
+            }
+
+            if (status != null) {
+                predicates.add(criteriaBuilder.equal(root.get("status"), status));
+            }
+
+            if (team != null) {
+                predicates.add(criteriaBuilder.equal(
+                    criteriaBuilder.lower(root.get("team")),
+                    team.toLowerCase(Locale.ROOT)
+                ));
+            }
+
+            return predicates.isEmpty()
+                ? criteriaBuilder.conjunction()
+                : criteriaBuilder.and(predicates.toArray(Predicate[]::new));
+        };
     }
 
     private RunResponse createNewRun(CreateRunRequest request, String idempotencyKey) {
