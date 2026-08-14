@@ -226,6 +226,54 @@ class RunApiIntegrationTest {
             .doesNotContain("\"type\":\"DOCUMENT_SUMMARY\"");
     }
 
+    @Test
+    void summarizesRunsAndAnalyses() throws Exception {
+        JsonNode beforeSummary = getRunSummary();
+
+        ResponseEntity<String> excessiveScenario = restTemplate.exchange(
+            url("/api/v1/simulator/scenarios/excessive-document-summary"),
+            HttpMethod.POST,
+            HttpEntity.EMPTY,
+            String.class
+        );
+        ResponseEntity<String> failedScenario = restTemplate.exchange(
+            url("/api/v1/simulator/scenarios/failed-high-cost-run"),
+            HttpMethod.POST,
+            HttpEntity.EMPTY,
+            String.class
+        );
+
+        JsonNode afterSummary = getRunSummary();
+
+        assertThat(excessiveScenario.getStatusCode()).isEqualTo(HttpStatus.CREATED);
+        assertThat(failedScenario.getStatusCode()).isEqualTo(HttpStatus.CREATED);
+
+        assertThat(afterSummary.get("totalRuns").asLong())
+            .isEqualTo(beforeSummary.get("totalRuns").asLong() + 2);
+        assertThat(afterSummary.get("successfulRuns").asLong())
+            .isEqualTo(beforeSummary.get("successfulRuns").asLong() + 1);
+        assertThat(afterSummary.get("failedRuns").asLong())
+            .isEqualTo(beforeSummary.get("failedRuns").asLong() + 1);
+        assertThat(afterSummary.get("analyzedRuns").asLong())
+            .isEqualTo(beforeSummary.get("analyzedRuns").asLong() + 2);
+        assertThat(afterSummary.get("unanalyzedRuns").asLong())
+            .isEqualTo(afterSummary.get("totalRuns").asLong() - afterSummary.get("analyzedRuns").asLong());
+        assertThat(afterSummary.get("highlyDisproportionateRuns").asLong())
+            .isGreaterThanOrEqualTo(beforeSummary.get("highlyDisproportionateRuns").asLong() + 1);
+        assertThat(afterSummary.get("estimatedCostReductionUsd").decimalValue())
+            .isGreaterThan(beforeSummary.get("estimatedCostReductionUsd").decimalValue());
+        assertThat(afterSummary.get("totalEstimatedCostUsd").decimalValue())
+            .isGreaterThan(beforeSummary.get("totalEstimatedCostUsd").decimalValue());
+        assertThat(afterSummary.get("averageBalanceScore").asInt()).isBetween(0, 100);
+    }
+
+    private JsonNode getRunSummary() throws Exception {
+        ResponseEntity<String> response = restTemplate.getForEntity(url("/api/v1/runs/summary"), String.class);
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+        return objectMapper.readTree(response.getBody());
+    }
+
     private HttpEntity<String> jsonEntity(String json) {
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);

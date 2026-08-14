@@ -1,6 +1,7 @@
 package com.meden.lens.run.api;
 
 import com.meden.lens.run.application.RunService;
+import com.meden.lens.run.application.RunSummaryService;
 import com.meden.lens.run.domain.ExecutionStatus;
 import com.meden.lens.taskprofile.domain.TaskType;
 import io.swagger.v3.oas.annotations.Operation;
@@ -24,9 +25,11 @@ import java.util.UUID;
 public class RunController {
 
     private final RunService runService;
+    private final RunSummaryService runSummaryService;
 
-    public RunController(RunService runService) {
+    public RunController(RunService runService, RunSummaryService runSummaryService) {
         this.runService = runService;
+        this.runSummaryService = runSummaryService;
     }
 
     @PostMapping
@@ -48,6 +51,12 @@ public class RunController {
         @RequestParam(required = false) String team
     ) {
         return runService.listRuns(taskType, status, team);
+    }
+
+    @GetMapping("/summary")
+    @Operation(summary = "Summarize execution run activity")
+    public RunSummaryResponse getRunSummary() {
+        return runSummaryService.getSummary();
     }
 
     @GetMapping("/{runId}")

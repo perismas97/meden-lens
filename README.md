@@ -54,6 +54,7 @@ Endpoints:
 ```text
 POST /api/v1/runs
 GET  /api/v1/runs?taskType=&status=&team=
+GET  /api/v1/runs/summary
 GET  /api/v1/runs/{runId}
 POST /api/v1/runs/{runId}/analysis
 GET  /api/v1/runs/{runId}/analysis
@@ -81,6 +82,12 @@ Stored runs can be listed for dashboard-style views:
 
 ```powershell
 Invoke-RestMethod -Method Get -Uri "http://localhost:8080/api/v1/runs?status=FAILED"
+```
+
+Dashboard-level run activity can be summarized with:
+
+```powershell
+Invoke-RestMethod -Method Get -Uri "http://localhost:8080/api/v1/runs/summary"
 ```
 
 ## Design Notes
