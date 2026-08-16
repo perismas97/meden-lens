@@ -53,7 +53,7 @@ Endpoints:
 
 ```text
 POST /api/v1/runs
-GET  /api/v1/runs?taskType=&status=&team=
+GET  /api/v1/runs?taskType=&status=&team=&page=0&size=20&sort=createdAt,desc
 GET  /api/v1/runs/summary
 GET  /api/v1/runs/{runId}
 POST /api/v1/runs/{runId}/analysis
@@ -81,7 +81,7 @@ The backend also includes simulator endpoints for creating and analyzing the sam
 Stored runs can be listed for dashboard-style views:
 
 ```powershell
-Invoke-RestMethod -Method Get -Uri "http://localhost:8080/api/v1/runs?status=FAILED"
+Invoke-RestMethod -Method Get -Uri "http://localhost:8080/api/v1/runs?status=FAILED&page=0&size=20&sort=createdAt,desc"
 ```
 
 Dashboard-level run activity can be summarized with:

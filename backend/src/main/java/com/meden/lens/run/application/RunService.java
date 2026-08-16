@@ -1,6 +1,7 @@
 package com.meden.lens.run.application;
 
 import com.meden.lens.run.api.CreateRunRequest;
+import com.meden.lens.run.api.RunPageResponse;
 import com.meden.lens.run.api.RunResponse;
 import com.meden.lens.run.domain.ExecutionRunEntity;
 import com.meden.lens.run.domain.ExecutionStatus;
@@ -12,6 +13,8 @@ import com.meden.lens.taskprofile.domain.TaskType;
 import com.meden.lens.taskprofile.infrastructure.TaskProfileRepository;
 import jakarta.persistence.criteria.Predicate;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
@@ -24,6 +27,10 @@ import java.util.UUID;
 
 @Service
 public class RunService {
+
+    private static final int DEFAULT_PAGE_SIZE = 20;
+    private static final int MAX_PAGE_SIZE = 100;
+    private static final String DEFAULT_SORT_PROPERTY = "createdAt";
 
     private final ExecutionRunRepository runRepository;
     private final TaskProfileRepository taskProfileRepository;
@@ -62,16 +69,76 @@ public class RunService {
     }
 
     @Transactional(readOnly = true)
-    public List<RunResponse> listRuns(TaskType taskType, ExecutionStatus status, String team) {
+    public RunPageResponse listRuns(
+        TaskType taskType,
+        ExecutionStatus status,
+        String team,
+        int page,
+        int size,
+        String sort
+    ) {
         String normalizedTeam = team == null || team.isBlank() ? null : team.trim();
+        int normalizedPage = Math.max(page, 0);
+        int normalizedSize = normalizePageSize(size);
+        RunSort runSort = resolveSort(sort);
 
-        return runRepository.findAll(
+        Page<ExecutionRunEntity> runPage = runRepository.findAll(
                 matchesFilters(taskType, status, normalizedTeam),
-                Sort.by(Sort.Direction.DESC, "createdAt")
-            )
+                PageRequest.of(normalizedPage, normalizedSize, runSort.toSpringSort())
+            );
+
+        List<RunResponse> items = runPage
             .stream()
             .map(run -> mapper.toResponse(run, false))
             .toList();
+
+        return new RunPageResponse(
+            items,
+            runPage.getNumber(),
+            runPage.getSize(),
+            runSort.responseValue(),
+            runPage.getTotalElements(),
+            runPage.getTotalPages(),
+            runPage.isFirst(),
+            runPage.isLast()
+        );
+    }
+
+    private int normalizePageSize(int size) {
+        if (size <= 0) {
+            return DEFAULT_PAGE_SIZE;
+        }
+
+        return Math.min(size, MAX_PAGE_SIZE);
+    }
+
+    private RunSort resolveSort(String sort) {
+        if (sort == null || sort.isBlank()) {
+            return new RunSort(DEFAULT_SORT_PROPERTY, Sort.Direction.DESC);
+        }
+
+        String[] parts = sort.split(",", 2);
+        String property = allowedSortProperty(parts[0].trim());
+        Sort.Direction direction = parts.length > 1 && "asc".equalsIgnoreCase(parts[1].trim())
+            ? Sort.Direction.ASC
+            : Sort.Direction.DESC;
+
+        return new RunSort(property, direction);
+    }
+
+    private String allowedSortProperty(String property) {
+        return switch (property) {
+            case "createdAt",
+                 "startedAt",
+                 "completedAt",
+                 "durationMs",
+                 "modelCalls",
+                 "toolCalls",
+                 "retryCount",
+                 "totalTokens",
+                 "estimatedCostUsd" -> property;
+            default -> DEFAULT_SORT_PROPERTY;
+        };
     }
 
     private Specification<ExecutionRunEntity> matchesFilters(
@@ -126,6 +193,17 @@ public class RunService {
                 "The execution request is invalid.",
                 List.of(new FieldErrorDetail("task.type", "does not have a configured task profile"))
             );
+        }
+    }
+
+    private record RunSort(String property, Sort.Direction direction) {
+
+        Sort toSpringSort() {
+            return Sort.by(direction, property);
+        }
+
+        String responseValue() {
+            return property + "," + direction.name().toLowerCase(Locale.ROOT);
         }
     }
 }

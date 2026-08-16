@@ -187,7 +187,7 @@ class RunApiIntegrationTest {
     }
 
     @Test
-    void listsRunsWithOptionalFilters() {
+    void listsRunsWithOptionalFilters() throws Exception {
         ResponseEntity<String> failedScenario = restTemplate.exchange(
             url("/api/v1/simulator/scenarios/failed-high-cost-run"),
             HttpMethod.POST,
@@ -201,10 +201,16 @@ class RunApiIntegrationTest {
             String.class
         );
 
-        ResponseEntity<String> allRuns = restTemplate.getForEntity(url("/api/v1/runs"), String.class);
-        ResponseEntity<String> failedRuns = restTemplate.getForEntity(url("/api/v1/runs?status=FAILED"), String.class);
+        ResponseEntity<String> allRuns = restTemplate.getForEntity(
+            url("/api/v1/runs?page=0&size=20&sort=createdAt,desc"),
+            String.class
+        );
+        ResponseEntity<String> failedRuns = restTemplate.getForEntity(
+            url("/api/v1/runs?status=FAILED&page=0&size=1"),
+            String.class
+        );
         ResponseEntity<String> deepResearchRuns = restTemplate.getForEntity(
-            url("/api/v1/runs?taskType=DEEP_RESEARCH&team=demo"),
+            url("/api/v1/runs?taskType=DEEP_RESEARCH&team=demo&page=0&size=10"),
             String.class
         );
 
@@ -212,15 +218,31 @@ class RunApiIntegrationTest {
         assertThat(deepResearchScenario.getStatusCode()).isEqualTo(HttpStatus.CREATED);
 
         assertThat(allRuns.getStatusCode()).isEqualTo(HttpStatus.OK);
+        JsonNode allRunsBody = objectMapper.readTree(allRuns.getBody());
+        assertThat(allRunsBody.get("items").isArray()).isTrue();
+        assertThat(allRunsBody.get("page").asInt()).isZero();
+        assertThat(allRunsBody.get("size").asInt()).isEqualTo(20);
+        assertThat(allRunsBody.get("sort").asText()).isEqualTo("createdAt,desc");
+        assertThat(allRunsBody.get("totalItems").asLong()).isGreaterThanOrEqualTo(2);
         assertThat(allRuns.getBody())
             .contains("sample-failed-expensive-run", "sample-valid-deep-research");
 
         assertThat(failedRuns.getStatusCode()).isEqualTo(HttpStatus.OK);
+        JsonNode failedRunsBody = objectMapper.readTree(failedRuns.getBody());
+        assertThat(failedRunsBody.get("items").size()).isEqualTo(1);
+        assertThat(failedRunsBody.get("page").asInt()).isZero();
+        assertThat(failedRunsBody.get("size").asInt()).isEqualTo(1);
+        assertThat(failedRunsBody.get("sort").asText()).isEqualTo("createdAt,desc");
+        assertThat(failedRunsBody.get("totalItems").asLong()).isGreaterThanOrEqualTo(1);
         assertThat(failedRuns.getBody())
             .contains("\"status\":\"FAILED\"", "sample-failed-expensive-run")
             .doesNotContain("\"status\":\"SUCCESS\"");
 
         assertThat(deepResearchRuns.getStatusCode()).isEqualTo(HttpStatus.OK);
+        JsonNode deepResearchRunsBody = objectMapper.readTree(deepResearchRuns.getBody());
+        assertThat(deepResearchRunsBody.get("items").isArray()).isTrue();
+        assertThat(deepResearchRunsBody.get("page").asInt()).isZero();
+        assertThat(deepResearchRunsBody.get("size").asInt()).isEqualTo(10);
         assertThat(deepResearchRuns.getBody())
             .contains("\"type\":\"DEEP_RESEARCH\"", "sample-valid-deep-research")
             .doesNotContain("\"type\":\"DOCUMENT_SUMMARY\"");

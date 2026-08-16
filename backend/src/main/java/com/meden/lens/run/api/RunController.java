@@ -17,7 +17,6 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-import java.util.List;
 import java.util.UUID;
 
 @RestController
@@ -45,12 +44,15 @@ public class RunController {
 
     @GetMapping
     @Operation(summary = "List execution runs")
-    public List<RunResponse> listRuns(
+    public RunPageResponse listRuns(
         @RequestParam(required = false) TaskType taskType,
         @RequestParam(required = false) ExecutionStatus status,
-        @RequestParam(required = false) String team
+        @RequestParam(required = false) String team,
+        @RequestParam(defaultValue = "0") int page,
+        @RequestParam(defaultValue = "20") int size,
+        @RequestParam(defaultValue = "createdAt,desc") String sort
     ) {
-        return runService.listRuns(taskType, status, team);
+        return runService.listRuns(taskType, status, team, page, size, sort);
     }
 
     @GetMapping("/summary")
