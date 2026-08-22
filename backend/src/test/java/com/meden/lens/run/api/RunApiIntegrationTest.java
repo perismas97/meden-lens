@@ -225,15 +225,24 @@ class RunApiIntegrationTest {
         assertThat(allRunsBody.get("sort").asText()).isEqualTo("createdAt,desc");
         assertThat(allRunsBody.get("totalItems").asLong()).isGreaterThanOrEqualTo(2);
         assertThat(allRuns.getBody())
-            .contains("sample-failed-expensive-run", "sample-valid-deep-research");
+            .contains(
+                "sample-failed-expensive-run",
+                "sample-valid-deep-research",
+                "\"analysis\"",
+                "\"analyzed\":true"
+            );
 
         assertThat(failedRuns.getStatusCode()).isEqualTo(HttpStatus.OK);
         JsonNode failedRunsBody = objectMapper.readTree(failedRuns.getBody());
+        JsonNode failedRunAnalysis = failedRunsBody.get("items").get(0).get("analysis");
         assertThat(failedRunsBody.get("items").size()).isEqualTo(1);
         assertThat(failedRunsBody.get("page").asInt()).isZero();
         assertThat(failedRunsBody.get("size").asInt()).isEqualTo(1);
         assertThat(failedRunsBody.get("sort").asText()).isEqualTo("createdAt,desc");
         assertThat(failedRunsBody.get("totalItems").asLong()).isGreaterThanOrEqualTo(1);
+        assertThat(failedRunAnalysis.get("analyzed").asBoolean()).isTrue();
+        assertThat(failedRunAnalysis.get("balanceScore").asInt()).isBetween(0, 100);
+        assertThat(failedRunAnalysis.get("classification").asText()).isNotBlank();
         assertThat(failedRuns.getBody())
             .contains("\"status\":\"FAILED\"", "sample-failed-expensive-run")
             .doesNotContain("\"status\":\"SUCCESS\"");
@@ -243,6 +252,7 @@ class RunApiIntegrationTest {
         assertThat(deepResearchRunsBody.get("items").isArray()).isTrue();
         assertThat(deepResearchRunsBody.get("page").asInt()).isZero();
         assertThat(deepResearchRunsBody.get("size").asInt()).isEqualTo(10);
+        assertThat(deepResearchRunsBody.get("items").get(0).get("analysis").get("analyzed").asBoolean()).isTrue();
         assertThat(deepResearchRuns.getBody())
             .contains("\"type\":\"DEEP_RESEARCH\"", "sample-valid-deep-research")
             .doesNotContain("\"type\":\"DOCUMENT_SUMMARY\"");

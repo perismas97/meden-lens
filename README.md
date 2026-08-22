@@ -84,6 +84,8 @@ Stored runs can be listed for dashboard-style views:
 Invoke-RestMethod -Method Get -Uri "http://localhost:8080/api/v1/runs?status=FAILED&page=0&size=20&sort=createdAt,desc"
 ```
 
+Each listed run includes an `analysis` overview with `analyzed`, `balanceScore`, `classification`, and `estimatedCostReductionUsd`, so dashboard tables can highlight problematic runs without making a separate analysis request for every row.
+
 Dashboard-level run activity can be summarized with:
 
 ```powershell

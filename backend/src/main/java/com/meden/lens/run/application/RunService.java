@@ -1,6 +1,9 @@
 package com.meden.lens.run.application;
 
+import com.meden.lens.analysis.domain.AnalysisEntity;
+import com.meden.lens.analysis.infrastructure.AnalysisRepository;
 import com.meden.lens.run.api.CreateRunRequest;
+import com.meden.lens.run.api.RunListItemResponse;
 import com.meden.lens.run.api.RunPageResponse;
 import com.meden.lens.run.api.RunResponse;
 import com.meden.lens.run.domain.ExecutionRunEntity;
@@ -21,9 +24,13 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.UUID;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 @Service
 public class RunService {
@@ -33,6 +40,7 @@ public class RunService {
     private static final String DEFAULT_SORT_PROPERTY = "createdAt";
 
     private final ExecutionRunRepository runRepository;
+    private final AnalysisRepository analysisRepository;
     private final TaskProfileRepository taskProfileRepository;
     private final IdempotencyKeyResolver idempotencyKeyResolver;
     private final RunRequestValidator validator;
@@ -40,12 +48,14 @@ public class RunService {
 
     public RunService(
         ExecutionRunRepository runRepository,
+        AnalysisRepository analysisRepository,
         TaskProfileRepository taskProfileRepository,
         IdempotencyKeyResolver idempotencyKeyResolver,
         RunRequestValidator validator,
         RunMapper mapper
     ) {
         this.runRepository = runRepository;
+        this.analysisRepository = analysisRepository;
         this.taskProfileRepository = taskProfileRepository;
         this.idempotencyKeyResolver = idempotencyKeyResolver;
         this.validator = validator;
@@ -87,9 +97,11 @@ public class RunService {
                 PageRequest.of(normalizedPage, normalizedSize, runSort.toSpringSort())
             );
 
-        List<RunResponse> items = runPage
+        Map<UUID, AnalysisEntity> analysesByRunId = findAnalysesByRunId(runPage.getContent());
+
+        List<RunListItemResponse> items = runPage
             .stream()
-            .map(run -> mapper.toResponse(run, false))
+            .map(run -> mapper.toListItemResponse(run, analysesByRunId.get(run.getId())))
             .toList();
 
         return new RunPageResponse(
@@ -102,6 +114,20 @@ public class RunService {
             runPage.isFirst(),
             runPage.isLast()
         );
+    }
+
+    private Map<UUID, AnalysisEntity> findAnalysesByRunId(List<ExecutionRunEntity> runs) {
+        if (runs.isEmpty()) {
+            return Collections.emptyMap();
+        }
+
+        List<UUID> runIds = runs.stream()
+            .map(ExecutionRunEntity::getId)
+            .toList();
+
+        return analysisRepository.findByExecutionRunIds(runIds)
+            .stream()
+            .collect(Collectors.toMap(analysis -> analysis.getExecutionRun().getId(), Function.identity()));
     }
 
     private int normalizePageSize(int size) {

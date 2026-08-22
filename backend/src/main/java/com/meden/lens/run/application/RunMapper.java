@@ -1,6 +1,8 @@
 package com.meden.lens.run.application;
 
+import com.meden.lens.analysis.domain.AnalysisEntity;
 import com.meden.lens.run.api.CreateRunRequest;
+import com.meden.lens.run.api.RunListItemResponse;
 import com.meden.lens.run.api.RunResponse;
 import com.meden.lens.run.domain.ExecutionRunEntity;
 import com.meden.lens.run.domain.ModelUsageEntity;
@@ -97,6 +99,45 @@ public class RunMapper {
                 .toList(),
             new RunResponse.MetadataResponse(entity.getEnvironment(), entity.getTeam(), entity.getPurpose()),
             entity.getCreatedAt()
+        );
+    }
+
+    public RunListItemResponse toListItemResponse(ExecutionRunEntity entity, AnalysisEntity analysis) {
+        return new RunListItemResponse(
+            entity.getId(),
+            entity.getExternalRunId(),
+            new RunResponse.AgentResponse(entity.getAgentName(), entity.getAgentVersion()),
+            new RunResponse.TaskResponse(entity.getTaskType(), entity.getTaskDescription(), entity.getTaskComplexity()),
+            new RunResponse.ExecutionResponse(
+                entity.getStatus(),
+                entity.getStartedAt(),
+                entity.getCompletedAt(),
+                entity.getDurationMs(),
+                entity.getModelCalls(),
+                entity.getToolCalls(),
+                entity.getRetryCount(),
+                entity.getSubAgentCount(),
+                entity.getInputTokens(),
+                entity.getOutputTokens(),
+                entity.getTotalTokens(),
+                entity.getEstimatedCostUsd()
+            ),
+            new RunResponse.MetadataResponse(entity.getEnvironment(), entity.getTeam(), entity.getPurpose()),
+            entity.getCreatedAt(),
+            toAnalysisOverviewResponse(analysis)
+        );
+    }
+
+    private RunListItemResponse.AnalysisOverviewResponse toAnalysisOverviewResponse(AnalysisEntity analysis) {
+        if (analysis == null) {
+            return new RunListItemResponse.AnalysisOverviewResponse(false, null, null, null);
+        }
+
+        return new RunListItemResponse.AnalysisOverviewResponse(
+            true,
+            analysis.getBalanceScore(),
+            analysis.getClassification(),
+            analysis.getEstimatedCostReductionUsd()
         );
     }
 
