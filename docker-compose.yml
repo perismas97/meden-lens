@@ -27,6 +27,7 @@ services:
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-meden_lens}
       SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-meden}
       SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-meden}
+      MEDEN_CORS_ALLOWED_ORIGINS: ${MEDEN_CORS_ALLOWED_ORIGINS:-http://localhost:5173,http://127.0.0.1:5173}
     ports:
       - "8080:8080"
 

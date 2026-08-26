@@ -38,8 +38,9 @@ The first vertical slice includes:
 - OpenAPI documentation.
 - Docker-based local setup.
 - Simulator endpoints for built-in demo scenarios.
+- Minimal React dashboard scaffold wired to run summary and listing APIs.
 
-Frontend, comparison screens, SDK ingestion, and adaptive baselines will follow after this backend slice is stable.
+Comparison screens, SDK ingestion, and adaptive baselines will follow after this slice is stable.
 
 ## Current API
 
@@ -130,6 +131,26 @@ PostgreSQL:
 
 ```text
 localhost:5432
+```
+
+Run the frontend:
+
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+Frontend:
+
+```text
+http://localhost:5173
+```
+
+The frontend reads the backend from:
+
+```text
+VITE_MEDEN_API_BASE_URL=http://localhost:8080
 ```
 
 ## Example Run
