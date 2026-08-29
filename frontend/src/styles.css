@@ -257,6 +257,70 @@ h2 {
   background: var(--surface);
 }
 
+.simulator-dock {
+  display: grid;
+  gap: 12px;
+  padding: 0 0 18px;
+}
+
+.simulator-heading {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.simulator-note,
+.simulator-muted,
+.simulator-error {
+  color: var(--quiet);
+  font-size: 0.8rem;
+}
+
+.simulator-error {
+  color: var(--red);
+}
+
+.scenario-grid {
+  display: grid;
+  border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+}
+
+.scenario-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: center;
+  min-width: 0;
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--line);
+}
+
+.scenario-row:last-child {
+  border-bottom: 0;
+}
+
+.scenario-row strong,
+.scenario-row span {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.scenario-row strong {
+  color: var(--ink);
+  font-size: 0.88rem;
+  font-weight: 650;
+}
+
+.scenario-row span {
+  margin-top: 3px;
+  color: var(--muted);
+  font-size: 0.78rem;
+}
+
 .table-scroll {
   overflow-x: auto;
   border-top: 1px solid var(--line);
@@ -506,6 +570,15 @@ h2 {
 
   .status-filter button {
     flex: 1 1 0;
+  }
+
+  .simulator-heading {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .scenario-row {
+    grid-template-columns: 1fr;
   }
 }
 

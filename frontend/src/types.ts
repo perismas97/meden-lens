@@ -71,3 +71,21 @@ export interface RunListItemResponse {
     estimatedCostReductionUsd: string | null;
   };
 }
+
+export interface SimulatorScenarioResponse {
+  key: string;
+  name: string;
+  description: string;
+  expectedSignal: string;
+}
+
+export interface SimulatedRunResponse {
+  scenarioKey: string;
+  scenarioName: string;
+  runCreated: boolean;
+  analysisCreated: boolean;
+  run: {
+    id: string;
+  };
+  analysis: unknown;
+}

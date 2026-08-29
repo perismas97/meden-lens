@@ -1,12 +1,18 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { fetchRunPage, fetchRunSummary } from "./api";
+import {
+  createSimulatorRun,
+  fetchRunPage,
+  fetchRunSummary,
+  fetchSimulatorScenarios
+} from "./api";
 import { apiHostLabel } from "./config";
 import type {
   AnalysisClassification,
   ExecutionStatus,
   RunListItemResponse,
   RunPageResponse,
-  RunSummaryResponse
+  RunSummaryResponse,
+  SimulatorScenarioResponse
 } from "./types";
 
 const PAGE_SIZE = 9;
@@ -32,21 +38,37 @@ const dateFormatter = new Intl.DateTimeFormat(undefined, {
 export default function App() {
   const [summary, setSummary] = useState<RunSummaryResponse | null>(null);
   const [runs, setRuns] = useState<RunPageResponse | null>(null);
+  const [scenarios, setScenarios] = useState<SimulatorScenarioResponse[]>([]);
   const [statusFilter, setStatusFilter] = useState<ExecutionStatus | "ALL">("ALL");
   const [selectedRunId, setSelectedRunId] = useState<string | null>(null);
   const [page, setPage] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
+  const [isLoadingScenarios, setIsLoadingScenarios] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [scenarioError, setScenarioError] = useState<string | null>(null);
+  const [runningScenarioKey, setRunningScenarioKey] = useState<string | null>(null);
+  const [simulationNotice, setSimulationNotice] = useState<string | null>(null);
 
   const loadDashboard = useCallback(
-    async (signal?: AbortSignal) => {
+    async ({
+      pageOverride,
+      signal,
+      statusOverride
+    }: {
+      pageOverride?: number;
+      signal?: AbortSignal;
+      statusOverride?: ExecutionStatus | "ALL";
+    } = {}) => {
       setIsLoading(true);
       setError(null);
+
+      const requestedPage = pageOverride ?? page;
+      const requestedStatus = statusOverride ?? statusFilter;
 
       try {
         const [summaryResponse, runPageResponse] = await Promise.all([
           fetchRunSummary(signal),
-          fetchRunPage({ page, size: PAGE_SIZE, status: statusFilter }, signal)
+          fetchRunPage({ page: requestedPage, size: PAGE_SIZE, status: requestedStatus }, signal)
         ]);
 
         setSummary(summaryResponse);
@@ -68,10 +90,58 @@ export default function App() {
 
   useEffect(() => {
     const controller = new AbortController();
-    void loadDashboard(controller.signal);
+    void loadDashboard({ signal: controller.signal });
 
     return () => controller.abort();
   }, [loadDashboard]);
+
+  const loadScenarios = useCallback(async (signal?: AbortSignal) => {
+    setIsLoadingScenarios(true);
+    setScenarioError(null);
+
+    try {
+      setScenarios(await fetchSimulatorScenarios(signal));
+    } catch (scenariosError) {
+      if (scenariosError instanceof DOMException && scenariosError.name === "AbortError") {
+        return;
+      }
+
+      setScenarioError(scenariosError instanceof Error ? scenariosError.message : "Request failed");
+    } finally {
+      if (!signal?.aborted) {
+        setIsLoadingScenarios(false);
+      }
+    }
+  }, []);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    void loadScenarios(controller.signal);
+
+    return () => controller.abort();
+  }, [loadScenarios]);
+
+  const handleCreateScenarioRun = useCallback(
+    async (scenario: SimulatorScenarioResponse) => {
+      setRunningScenarioKey(scenario.key);
+      setScenarioError(null);
+      setSimulationNotice(null);
+
+      try {
+        const simulatedRun = await createSimulatorRun(scenario.key);
+        setStatusFilter("ALL");
+        setPage(0);
+        setSimulationNotice(`${simulatedRun.scenarioName} added`);
+        await loadDashboard({ pageOverride: 0, statusOverride: "ALL" });
+        setSelectedRunId(simulatedRun.run.id);
+      } catch (simulationError) {
+        setScenarioError(simulationError instanceof Error ? simulationError.message : "Request failed");
+      } finally {
+        setRunningScenarioKey(null);
+      }
+    },
+    [loadDashboard]
+  );
 
   const items = useMemo(() => runs?.items ?? [], [runs]);
   const selectedRun = useMemo(
@@ -146,6 +216,15 @@ export default function App() {
             </div>
           </div>
 
+          <SimulatorDock
+            error={scenarioError}
+            isLoading={isLoadingScenarios}
+            notice={simulationNotice}
+            runningScenarioKey={runningScenarioKey}
+            scenarios={scenarios}
+            onRun={handleCreateScenarioRun}
+          />
+
           {error ? <RequestState tone="error" title="API unavailable" detail={error} /> : null}
 
           {!error && isLoading ? (
@@ -190,6 +269,63 @@ export default function App() {
         <RunInspector run={selectedRun} summary={summary} />
       </section>
     </main>
+  );
+}
+
+function SimulatorDock({
+  error,
+  isLoading,
+  notice,
+  onRun,
+  runningScenarioKey,
+  scenarios
+}: {
+  error: string | null;
+  isLoading: boolean;
+  notice: string | null;
+  onRun: (scenario: SimulatorScenarioResponse) => void;
+  runningScenarioKey: string | null;
+  scenarios: SimulatorScenarioResponse[];
+}) {
+  return (
+    <section className="simulator-dock" aria-labelledby="simulator-heading">
+      <div className="simulator-heading">
+        <div>
+          <p className="eyebrow">Simulator</p>
+          <h2 id="simulator-heading">Synthetic runs</h2>
+        </div>
+        {notice ? <span className="simulator-note">{notice}</span> : null}
+      </div>
+
+      {error ? <span className="simulator-error">Simulator unavailable: {error}</span> : null}
+
+      {isLoading ? <span className="simulator-muted">Loading scenarios</span> : null}
+
+      {!isLoading && !error && scenarios.length === 0 ? (
+        <span className="simulator-muted">No scenarios available</span>
+      ) : null}
+
+      {!isLoading && scenarios.length > 0 ? (
+        <div className="scenario-grid">
+          {scenarios.map((scenario) => (
+            <article className="scenario-row" key={scenario.key}>
+              <div>
+                <strong>{scenario.name}</strong>
+                <span>{scenario.expectedSignal}</span>
+              </div>
+              <button
+                className="quiet-button"
+                disabled={runningScenarioKey !== null}
+                type="button"
+                onClick={() => onRun(scenario)}
+              >
+                {runningScenarioKey === scenario.key ? "Running" : "Run"}
+              </button>
+            </article>
+          ))}
+        </div>
+      ) : null}
+    </section>
   );
 }
 

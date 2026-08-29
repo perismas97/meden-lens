@@ -39,6 +39,7 @@ The first vertical slice includes:
 - Docker-based local setup.
 - Simulator endpoints for built-in demo scenarios.
 - Minimal React dashboard scaffold wired to run summary and listing APIs.
+- Frontend simulator controls for creating demo runs from the browser.
 
 Comparison screens, SDK ingestion, and adaptive baselines will follow after this slice is stable.
 
@@ -78,6 +79,7 @@ Ready-to-run sample payloads live in [`samples/runs`](samples/runs).
 See [`docs/examples.md`](docs/examples.md) for PowerShell commands that create a run, analyze it, and fetch the stored analysis.
 
 The backend also includes simulator endpoints for creating and analyzing the same scenario types directly from the API.
+The frontend can create these simulator runs from the browser and refresh the ledger automatically.
 
 Stored runs can be listed for dashboard-style views:
 

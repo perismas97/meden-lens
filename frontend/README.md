@@ -2,6 +2,8 @@
 
 Minimal React dashboard for reviewing AI agent execution runs from the Meden Lens API.
 
+The dashboard includes simulator controls for creating sample runs from the browser.
+
 ## Run Locally
 
 Install dependencies:
