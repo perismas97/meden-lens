@@ -1,6 +1,7 @@
 # Meden Lens
 
 [![Backend CI](https://github.com/perismas97/meden-lens/actions/workflows/backend-ci.yml/badge.svg)](https://github.com/perismas97/meden-lens/actions/workflows/backend-ci.yml)
+[![Frontend CI](https://github.com/perismas97/meden-lens/actions/workflows/frontend-ci.yml/badge.svg)](https://github.com/perismas97/meden-lens/actions/workflows/frontend-ci.yml)
 
 Goal-aware efficiency analysis for AI agents.
 
