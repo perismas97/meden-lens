@@ -130,6 +130,9 @@ button:disabled {
 }
 
 .signal {
+  display: grid;
+  grid-template-rows: auto auto auto 2px auto;
+  gap: 6px;
   min-width: 0;
   padding: 15px 18px;
   border-right: 1px solid var(--line);
@@ -140,7 +143,8 @@ button:disabled {
 }
 
 .signal small,
-.signal span {
+.signal-note,
+.signal em {
   display: block;
   overflow: hidden;
   color: var(--muted);
@@ -154,7 +158,6 @@ button:disabled {
 
 .signal strong {
   display: block;
-  margin: 8px 0 3px;
   color: var(--ink);
   font-family: "Cascadia Code", "SFMono-Regular", Consolas, monospace;
   font-size: 1.45rem;
@@ -162,8 +165,52 @@ button:disabled {
   line-height: 1;
 }
 
-.signal span {
+.signal-note {
   font-size: 0.78rem;
+}
+
+.signal-meter {
+  overflow: hidden;
+  height: 2px;
+  margin-top: 3px;
+  background: #e4e8df;
+}
+
+.signal-meter span {
+  display: block;
+  height: 100%;
+  max-width: 100%;
+  background: var(--line-strong);
+}
+
+.signal.good .signal-meter span {
+  background: var(--green);
+}
+
+.signal.watch .signal-meter span {
+  background: var(--amber);
+}
+
+.signal.critical .signal-meter span {
+  background: var(--red);
+}
+
+.signal em {
+  color: var(--quiet);
+  font-size: 0.76rem;
+  font-style: normal;
+}
+
+.signal.good strong {
+  color: var(--green);
+}
+
+.signal.watch strong {
+  color: var(--amber);
+}
+
+.signal.critical strong {
+  color: var(--red);
 }
 
 .workbench {

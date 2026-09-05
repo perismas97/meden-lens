@@ -35,6 +35,15 @@ const dateFormatter = new Intl.DateTimeFormat(undefined, {
   month: "short"
 });
 
+interface SummarySignal {
+  detail: string;
+  label: string;
+  meter: number;
+  note: string;
+  tone: "critical" | "good" | "neutral" | "watch";
+  value: string;
+}
+
 export default function App() {
   const [summary, setSummary] = useState<RunSummaryResponse | null>(null);
   const [runs, setRuns] = useState<RunPageResponse | null>(null);
@@ -178,11 +187,15 @@ export default function App() {
 
       <section className="signal-line" aria-label="Run summary">
         {metrics.map((metric) => (
-          <div className="signal" key={metric.label}>
+          <article className={`signal ${metric.tone}`} key={metric.label}>
             <small>{metric.label}</small>
             <strong>{metric.value}</strong>
-            <span>{metric.note}</span>
-          </div>
+            <span className="signal-note">{metric.note}</span>
+            <div className="signal-meter" aria-hidden="true">
+              <span style={{ width: `${metric.meter}%` }} />
+            </div>
+            <em>{metric.detail}</em>
+          </article>
         ))}
       </section>
 
@@ -463,29 +476,87 @@ function RequestState({
   );
 }
 
-function buildMetrics(summary: RunSummaryResponse | null) {
+function buildMetrics(summary: RunSummaryResponse | null): SummarySignal[] {
+  if (!summary) {
+    return [
+      placeholderMetric("Analysis coverage"),
+      placeholderMetric("Exceptions"),
+      placeholderMetric("Failed runs"),
+      placeholderMetric("Reducible cost")
+    ];
+  }
+
+  const analyzedPercent = percentage(summary.analyzedRuns, summary.totalRuns);
+  const exceptions = reviewCount(summary);
+  const exceptionPercent = percentage(exceptions, summary.analyzedRuns);
+  const failurePercent = percentage(summary.failedRuns, summary.totalRuns);
+  const reduciblePercent = moneyPercentage(
+    summary.estimatedCostReductionUsd,
+    summary.totalEstimatedCostUsd
+  );
+  const hasRuns = summary.totalRuns > 0;
+  const hasAnalyzedRuns = summary.analyzedRuns > 0;
+  const hasObservedSpend = Number(summary.totalEstimatedCostUsd) > 0;
+  const coverageDetail = !hasRuns
+    ? "no runs submitted"
+    : summary.unanalyzedRuns === 0
+    ? "all runs scored"
+    : `${formatCount(summary.unanalyzedRuns)} waiting`;
+  const coverageTone = !hasRuns
+    ? "neutral"
+    : analyzedPercent >= 90
+    ? "good"
+    : analyzedPercent >= 60
+    ? "neutral"
+    : "watch";
+
   return [
     {
-      label: "Runs",
-      value: summary ? formatCount(summary.totalRuns) : "-",
-      note: summary ? `${formatCount(summary.analyzedRuns)} analyzed` : "waiting"
+      detail: coverageDetail,
+      label: "Analysis coverage",
+      meter: analyzedPercent,
+      note: `${formatCount(summary.analyzedRuns)} of ${formatCount(summary.totalRuns)} runs`,
+      tone: coverageTone,
+      value: `${analyzedPercent}%`
     },
     {
-      label: "Mean balance",
-      value: summary ? String(summary.averageBalanceScore) : "-",
-      note: summary ? scoreBand(summary.averageBalanceScore) : "waiting"
-    },
-    {
+      detail: exceptionBreakdown(summary),
       label: "Exceptions",
-      value: summary ? formatCount(reviewCount(summary)) : "-",
-      note: summary ? `${formatCount(summary.failedRuns)} failed` : "waiting"
+      meter: exceptionPercent,
+      note: hasAnalyzedRuns ? `${exceptionPercent}% of analyzed runs` : "no analyzed runs",
+      tone: exceptionTone(summary),
+      value: formatCount(exceptions)
     },
     {
+      detail: hasRuns ? `${formatCount(summary.successfulRuns)} successful` : "no runs submitted",
+      label: "Failed runs",
+      meter: failurePercent,
+      note: hasRuns ? `${failurePercent}% failure rate` : "no runs submitted",
+      tone: summary.failedRuns === 0 ? "good" : failurePercent >= 20 ? "critical" : "watch",
+      value: formatCount(summary.failedRuns)
+    },
+    {
+      detail: hasObservedSpend
+        ? `${formatMoney(summary.totalEstimatedCostUsd)} observed`
+        : "no spend observed",
       label: "Reducible cost",
-      value: summary ? formatMoney(summary.estimatedCostReductionUsd) : "-",
-      note: summary ? `${formatMoney(summary.totalEstimatedCostUsd)} observed` : "waiting"
+      meter: reduciblePercent,
+      note: hasObservedSpend ? `${reduciblePercent}% of observed cost` : "no spend observed",
+      tone: reduciblePercent === 0 ? "good" : reduciblePercent >= 25 ? "critical" : "watch",
+      value: formatMoney(summary.estimatedCostReductionUsd)
     }
   ];
+}
+
+function placeholderMetric(label: string): SummarySignal {
+  return {
+    detail: "waiting",
+    label,
+    meter: 0,
+    note: "no signal yet",
+    tone: "neutral",
+    value: "-"
+  };
 }
 
 function formatMoney(value: string | null | undefined) {
@@ -585,4 +656,40 @@ function highestRisk(summary: RunSummaryResponse) {
   }
 
   return "Stable";
+}
+
+function exceptionBreakdown(summary: RunSummaryResponse) {
+  const parts = [
+    [summary.highlyDisproportionateRuns, "highly"],
+    [summary.disproportionateRuns, "disproportionate"],
+    [summary.slightlyExcessiveRuns, "slight"]
+  ]
+    .filter(([count]) => Number(count) > 0)
+    .map(([count, label]) => `${formatCount(Number(count))} ${label}`);
+
+  return parts.length > 0 ? parts.join(" / ") : "no excess classifications";
+}
+
+function exceptionTone(summary: RunSummaryResponse): SummarySignal["tone"] {
+  if (summary.highlyDisproportionateRuns > 0 || summary.disproportionateRuns > 0) {
+    return "critical";
+  }
+
+  if (summary.slightlyExcessiveRuns > 0) {
+    return "watch";
+  }
+
+  return "good";
+}
+
+function moneyPercentage(part: string | null | undefined, total: string | null | undefined) {
+  return percentage(Number(part ?? 0), Number(total ?? 0));
+}
+
+function percentage(part: number, total: number) {
+  if (!Number.isFinite(part) || !Number.isFinite(total) || total <= 0) {
+    return 0;
+  }
+
+  return Math.min(100, Math.round((part / total) * 100));
 }
