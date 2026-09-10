@@ -7,6 +7,40 @@ export type AnalysisClassification =
   | "DISPROPORTIONATE"
   | "HIGHLY_DISPROPORTIONATE";
 
+export type FindingSeverity = "INFO" | "LOW" | "MEDIUM" | "HIGH" | "CRITICAL";
+
+export type FindingCode =
+  | "EXCESSIVE_MODEL_CALLS"
+  | "EXCESSIVE_TOOL_USAGE"
+  | "TOKEN_BUDGET_EXCEEDED"
+  | "INPUT_CONTEXT_TOO_LARGE"
+  | "OUTPUT_TOO_VERBOSE"
+  | "COST_DISPROPORTIONATE_TO_TASK"
+  | "LATENCY_ABOVE_EXPECTED"
+  | "RETRY_LOOP_DETECTED"
+  | "UNNECESSARY_SUB_AGENTS"
+  | "TOOLS_USED_FOR_NON_TOOL_TASK"
+  | "PREMIUM_MODEL_FOR_SIMPLE_TASK"
+  | "FAILED_RUN_WITH_HIGH_COST"
+  | "INSUFFICIENT_EXECUTION"
+  | "BALANCED_EXECUTION";
+
+export type RecommendationCode =
+  | "REDUCE_MODEL_CALLS"
+  | "REDUCE_TOOL_CALLS"
+  | "DISABLE_UNNECESSARY_TOOLS"
+  | "SET_TOKEN_BUDGET"
+  | "REDUCE_CONTEXT_SIZE"
+  | "USE_SMALLER_MODEL"
+  | "ADD_RETRY_LIMIT"
+  | "DISABLE_SUB_AGENTS"
+  | "CACHE_REPEATED_RESULTS"
+  | "USE_DETERMINISTIC_CODE"
+  | "SPLIT_TASK_INTO_STAGES"
+  | "REVIEW_TASK_PROFILE";
+
+export type EstimatedImpact = "LOW" | "MEDIUM" | "HIGH";
+
 export interface RunSummaryResponse {
   totalRuns: number;
   successfulRuns: number;
@@ -70,6 +104,43 @@ export interface RunListItemResponse {
     classification: AnalysisClassification | null;
     estimatedCostReductionUsd: string | null;
   };
+}
+
+export interface AnalysisResponse {
+  id: string;
+  runId: string;
+  balanceScore: number;
+  classification: AnalysisClassification;
+  scores: {
+    costEfficiency: number;
+    tokenEfficiency: number;
+    toolEfficiency: number;
+    modelCallEfficiency: number;
+    latencyEfficiency: number;
+    retryEfficiency: number;
+    autonomyEfficiency: number;
+  };
+  findings: Array<{
+    id: string;
+    code: FindingCode;
+    severity: FindingSeverity;
+    message: string;
+    actualValue: string | null;
+    expectedValue: string | null;
+    explanation: string | null;
+  }>;
+  recommendations: Array<{
+    id: string;
+    code: RecommendationCode;
+    message: string;
+    estimatedImpact: EstimatedImpact;
+    relatedFindingCode: FindingCode | null;
+  }>;
+  estimatedSavings: {
+    estimatedCostReductionUsd: string | number;
+    estimatedSavingsPercent: string | number;
+  };
+  analyzedAt: string;
 }
 
 export interface SimulatorScenarioResponse {

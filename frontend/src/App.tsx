@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   createSimulatorRun,
+  fetchRunAnalysis,
   fetchRunPage,
   fetchRunSummary,
   fetchSimulatorScenarios
@@ -8,7 +9,9 @@ import {
 import { apiHostLabel } from "./config";
 import type {
   AnalysisClassification,
+  AnalysisResponse,
   ExecutionStatus,
+  FindingSeverity,
   RunListItemResponse,
   RunPageResponse,
   RunSummaryResponse,
@@ -50,10 +53,13 @@ export default function App() {
   const [scenarios, setScenarios] = useState<SimulatorScenarioResponse[]>([]);
   const [statusFilter, setStatusFilter] = useState<ExecutionStatus | "ALL">("ALL");
   const [selectedRunId, setSelectedRunId] = useState<string | null>(null);
+  const [analysisDetails, setAnalysisDetails] = useState<AnalysisResponse | null>(null);
   const [page, setPage] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
+  const [isLoadingAnalysis, setIsLoadingAnalysis] = useState(false);
   const [isLoadingScenarios, setIsLoadingScenarios] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [analysisError, setAnalysisError] = useState<string | null>(null);
   const [scenarioError, setScenarioError] = useState<string | null>(null);
   const [runningScenarioKey, setRunningScenarioKey] = useState<string | null>(null);
   const [simulationNotice, setSimulationNotice] = useState<string | null>(null);
@@ -157,6 +163,8 @@ export default function App() {
     () => items.find((run) => run.id === selectedRunId) ?? items[0] ?? null,
     [items, selectedRunId]
   );
+  const selectedRunIdForAnalysis = selectedRun?.id ?? null;
+  const selectedRunAnalyzed = selectedRun?.analysis.analyzed ?? false;
   const metrics = useMemo(() => buildMetrics(summary), [summary]);
   const backendState = error ? "offline" : isLoading ? "loading" : "ready";
 
@@ -170,6 +178,38 @@ export default function App() {
       setSelectedRunId(items[0].id);
     }
   }, [items, selectedRunId]);
+
+  useEffect(() => {
+    if (!selectedRunIdForAnalysis || !selectedRunAnalyzed) {
+      setAnalysisDetails(null);
+      setAnalysisError(null);
+      setIsLoadingAnalysis(false);
+      return;
+    }
+
+    const controller = new AbortController();
+
+    setIsLoadingAnalysis(true);
+    setAnalysisError(null);
+
+    fetchRunAnalysis(selectedRunIdForAnalysis, controller.signal)
+      .then((analysis) => setAnalysisDetails(analysis))
+      .catch((runAnalysisError) => {
+        if (runAnalysisError instanceof DOMException && runAnalysisError.name === "AbortError") {
+          return;
+        }
+
+        setAnalysisDetails(null);
+        setAnalysisError(runAnalysisError instanceof Error ? runAnalysisError.message : "Request failed");
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) {
+          setIsLoadingAnalysis(false);
+        }
+      });
+
+    return () => controller.abort();
+  }, [selectedRunAnalyzed, selectedRunIdForAnalysis]);
 
   return (
     <main className="ledger-shell">
@@ -279,7 +319,13 @@ export default function App() {
           ) : null}
         </section>
 
-        <RunInspector run={selectedRun} summary={summary} />
+        <RunInspector
+          analysis={analysisDetails}
+          analysisError={analysisError}
+          isLoadingAnalysis={isLoadingAnalysis}
+          run={selectedRun}
+          summary={summary}
+        />
       </section>
     </main>
   );
@@ -406,9 +452,15 @@ function RunLedger({
 }
 
 function RunInspector({
+  analysis,
+  analysisError,
+  isLoadingAnalysis,
   run,
   summary
 }: {
+  analysis: AnalysisResponse | null;
+  analysisError: string | null;
+  isLoadingAnalysis: boolean;
   run: RunListItemResponse | null;
   summary: RunSummaryResponse | null;
 }) {
@@ -446,7 +498,119 @@ function RunInspector({
         <Fact label="Retries" value={formatCount(run.execution.retryCount)} />
         <Fact label="Cost" value={formatMoney(run.execution.estimatedCostUsd)} />
       </dl>
+
+      <AnalysisDetail
+        analysis={analysis}
+        error={analysisError}
+        isAnalyzed={run.analysis.analyzed}
+        isLoading={isLoadingAnalysis}
+      />
     </aside>
+  );
+}
+
+function AnalysisDetail({
+  analysis,
+  error,
+  isAnalyzed,
+  isLoading
+}: {
+  analysis: AnalysisResponse | null;
+  error: string | null;
+  isAnalyzed: boolean;
+  isLoading: boolean;
+}) {
+  if (!isAnalyzed) {
+    return (
+      <section className="analysis-detail" aria-label="Analysis details">
+        <p className="analysis-empty">Analysis has not been created for this run.</p>
+      </section>
+    );
+  }
+
+  if (isLoading) {
+    return (
+      <section className="analysis-detail" aria-label="Analysis details">
+        <p className="analysis-empty">Loading analysis details.</p>
+      </section>
+    );
+  }
+
+  if (error) {
+    return (
+      <section className="analysis-detail" aria-label="Analysis details">
+        <p className="analysis-empty error">Analysis unavailable: {error}</p>
+      </section>
+    );
+  }
+
+  if (!analysis) {
+    return null;
+  }
+
+  return (
+    <section className="analysis-detail" aria-label="Analysis details">
+      <div className="analysis-meta">
+        <span>Estimated reduction</span>
+        <strong>{formatMoney(analysis.estimatedSavings.estimatedCostReductionUsd)}</strong>
+      </div>
+
+      <div className="analysis-section">
+        <div className="section-heading">
+          <span>Findings</span>
+          <small>{analysis.findings.length}</small>
+        </div>
+
+        {analysis.findings.length === 0 ? (
+          <p className="analysis-empty">No findings recorded.</p>
+        ) : (
+          <div className="finding-list">
+            {analysis.findings.map((finding) => (
+              <article className="finding-row" key={finding.id}>
+                <div className="finding-meta">
+                  <span className={`severity ${severityTone(finding.severity)}`}>
+                    {formatSeverity(finding.severity)}
+                  </span>
+                  <small>{formatEnum(finding.code)}</small>
+                </div>
+                <p>{finding.message}</p>
+                {finding.explanation ? <em>{finding.explanation}</em> : null}
+                {finding.actualValue || finding.expectedValue ? (
+                  <span className="finding-values">
+                    {finding.actualValue ?? "-"} actual / {finding.expectedValue ?? "-"} expected
+                  </span>
+                ) : null}
+              </article>
+            ))}
+          </div>
+        )}
+      </div>
+
+      <div className="analysis-section">
+        <div className="section-heading">
+          <span>Recommendations</span>
+          <small>{analysis.recommendations.length}</small>
+        </div>
+
+        {analysis.recommendations.length === 0 ? (
+          <p className="analysis-empty">No recommendations recorded.</p>
+        ) : (
+          <div className="recommendation-list">
+            {analysis.recommendations.map((recommendation) => (
+              <article className="recommendation-row" key={recommendation.id}>
+                <div className="finding-meta">
+                  <span className={`impact ${recommendation.estimatedImpact.toLowerCase()}`}>
+                    {formatEnum(recommendation.estimatedImpact)}
+                  </span>
+                  <small>{formatEnum(recommendation.code)}</small>
+                </div>
+                <p>{recommendation.message}</p>
+              </article>
+            ))}
+          </div>
+        )}
+      </div>
+    </section>
   );
 }
 
@@ -559,7 +723,7 @@ function placeholderMetric(label: string): SummarySignal {
   };
 }
 
-function formatMoney(value: string | null | undefined) {
+function formatMoney(value: string | number | null | undefined) {
   const amount = Number(value ?? 0);
   return moneyFormatter.format(Number.isFinite(amount) ? amount : 0);
 }
@@ -591,11 +755,27 @@ function formatClassification(classification: AnalysisClassification | null) {
     return "Not analyzed";
   }
 
-  return classification
+  return formatEnum(classification);
+}
+
+function formatEnum(value: string) {
+  return value
     .toLowerCase()
     .split("_")
     .map((word) => word[0].toUpperCase() + word.slice(1))
     .join(" ");
+}
+
+function formatSeverity(severity: FindingSeverity) {
+  if (severity === "INFO") {
+    return "Info";
+  }
+
+  return formatEnum(severity);
+}
+
+function severityTone(severity: FindingSeverity) {
+  return severity.toLowerCase();
 }
 
 function classificationTone(classification: AnalysisClassification | null) {

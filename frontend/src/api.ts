@@ -1,5 +1,6 @@
 import { API_BASE_URL } from "./config";
 import type {
+  AnalysisResponse,
   ExecutionStatus,
   RunPageResponse,
   RunSummaryResponse,
@@ -29,6 +30,10 @@ export function fetchRunPage(params: RunPageParams, signal?: AbortSignal) {
   }
 
   return getJson<RunPageResponse>(`/api/v1/runs?${query.toString()}`, signal);
+}
+
+export function fetchRunAnalysis(runId: string, signal?: AbortSignal) {
+  return getJson<AnalysisResponse>(`/api/v1/runs/${encodeURIComponent(runId)}/analysis`, signal);
 }
 
 export function fetchSimulatorScenarios(signal?: AbortSignal) {
