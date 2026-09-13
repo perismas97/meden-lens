@@ -5,13 +5,16 @@ import type {
   RunPageResponse,
   RunSummaryResponse,
   SimulatedRunResponse,
-  SimulatorScenarioResponse
+  SimulatorScenarioResponse,
+  TaskProfileResponse
 } from "./types";
 
 interface RunPageParams {
   page: number;
   size: number;
   status: ExecutionStatus | "ALL";
+  taskType: string;
+  team: string;
 }
 
 export function fetchRunSummary(signal?: AbortSignal) {
@@ -29,11 +32,24 @@ export function fetchRunPage(params: RunPageParams, signal?: AbortSignal) {
     query.set("status", params.status);
   }
 
+  if (params.taskType !== "ALL") {
+    query.set("taskType", params.taskType);
+  }
+
+  const team = params.team.trim();
+  if (team.length > 0) {
+    query.set("team", team);
+  }
+
   return getJson<RunPageResponse>(`/api/v1/runs?${query.toString()}`, signal);
 }
 
 export function fetchRunAnalysis(runId: string, signal?: AbortSignal) {
   return getJson<AnalysisResponse>(`/api/v1/runs/${encodeURIComponent(runId)}/analysis`, signal);
+}
+
+export function fetchTaskProfiles(signal?: AbortSignal) {
+  return getJson<TaskProfileResponse[]>("/api/v1/task-profiles", signal);
 }
 
 export function fetchSimulatorScenarios(signal?: AbortSignal) {

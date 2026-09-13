@@ -4,7 +4,8 @@ import {
   fetchRunAnalysis,
   fetchRunPage,
   fetchRunSummary,
-  fetchSimulatorScenarios
+  fetchSimulatorScenarios,
+  fetchTaskProfiles
 } from "./api";
 import { apiHostLabel } from "./config";
 import type {
@@ -15,7 +16,8 @@ import type {
   RunListItemResponse,
   RunPageResponse,
   RunSummaryResponse,
-  SimulatorScenarioResponse
+  SimulatorScenarioResponse,
+  TaskProfileResponse
 } from "./types";
 
 const PAGE_SIZE = 9;
@@ -51,7 +53,11 @@ export default function App() {
   const [summary, setSummary] = useState<RunSummaryResponse | null>(null);
   const [runs, setRuns] = useState<RunPageResponse | null>(null);
   const [scenarios, setScenarios] = useState<SimulatorScenarioResponse[]>([]);
+  const [taskProfiles, setTaskProfiles] = useState<TaskProfileResponse[]>([]);
   const [statusFilter, setStatusFilter] = useState<ExecutionStatus | "ALL">("ALL");
+  const [taskTypeFilter, setTaskTypeFilter] = useState("ALL");
+  const [teamFilter, setTeamFilter] = useState("");
+  const [teamDraft, setTeamDraft] = useState("");
   const [selectedRunId, setSelectedRunId] = useState<string | null>(null);
   const [analysisDetails, setAnalysisDetails] = useState<AnalysisResponse | null>(null);
   const [page, setPage] = useState(0);
@@ -61,6 +67,7 @@ export default function App() {
   const [error, setError] = useState<string | null>(null);
   const [analysisError, setAnalysisError] = useState<string | null>(null);
   const [scenarioError, setScenarioError] = useState<string | null>(null);
+  const [taskProfileError, setTaskProfileError] = useState<string | null>(null);
   const [runningScenarioKey, setRunningScenarioKey] = useState<string | null>(null);
   const [simulationNotice, setSimulationNotice] = useState<string | null>(null);
 
@@ -68,22 +75,37 @@ export default function App() {
     async ({
       pageOverride,
       signal,
-      statusOverride
+      statusOverride,
+      taskTypeOverride,
+      teamOverride
     }: {
       pageOverride?: number;
       signal?: AbortSignal;
       statusOverride?: ExecutionStatus | "ALL";
+      taskTypeOverride?: string;
+      teamOverride?: string;
     } = {}) => {
       setIsLoading(true);
       setError(null);
 
       const requestedPage = pageOverride ?? page;
       const requestedStatus = statusOverride ?? statusFilter;
+      const requestedTaskType = taskTypeOverride ?? taskTypeFilter;
+      const requestedTeam = teamOverride ?? teamFilter;
 
       try {
         const [summaryResponse, runPageResponse] = await Promise.all([
           fetchRunSummary(signal),
-          fetchRunPage({ page: requestedPage, size: PAGE_SIZE, status: requestedStatus }, signal)
+          fetchRunPage(
+            {
+              page: requestedPage,
+              size: PAGE_SIZE,
+              status: requestedStatus,
+              taskType: requestedTaskType,
+              team: requestedTeam
+            },
+            signal
+          )
         ]);
 
         setSummary(summaryResponse);
@@ -100,7 +122,7 @@ export default function App() {
         }
       }
     },
-    [page, statusFilter]
+    [page, statusFilter, taskTypeFilter, teamFilter]
   );
 
   useEffect(() => {
@@ -109,6 +131,27 @@ export default function App() {
 
     return () => controller.abort();
   }, [loadDashboard]);
+
+  const loadTaskProfiles = useCallback(async (signal?: AbortSignal) => {
+    setTaskProfileError(null);
+
+    try {
+      setTaskProfiles(await fetchTaskProfiles(signal));
+    } catch (profilesError) {
+      if (profilesError instanceof DOMException && profilesError.name === "AbortError") {
+        return;
+      }
+
+      setTaskProfileError(profilesError instanceof Error ? profilesError.message : "Request failed");
+    }
+  }, []);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    void loadTaskProfiles(controller.signal);
+
+    return () => controller.abort();
+  }, [loadTaskProfiles]);
 
   const loadScenarios = useCallback(async (signal?: AbortSignal) => {
     setIsLoadingScenarios(true);
@@ -145,9 +188,17 @@ export default function App() {
       try {
         const simulatedRun = await createSimulatorRun(scenario.key);
         setStatusFilter("ALL");
+        setTaskTypeFilter("ALL");
+        setTeamFilter("");
+        setTeamDraft("");
         setPage(0);
         setSimulationNotice(`${simulatedRun.scenarioName} added`);
-        await loadDashboard({ pageOverride: 0, statusOverride: "ALL" });
+        await loadDashboard({
+          pageOverride: 0,
+          statusOverride: "ALL",
+          taskTypeOverride: "ALL",
+          teamOverride: ""
+        });
         setSelectedRunId(simulatedRun.run.id);
       } catch (simulationError) {
         setScenarioError(simulationError instanceof Error ? simulationError.message : "Request failed");
@@ -211,6 +262,29 @@ export default function App() {
     return () => controller.abort();
   }, [selectedRunAnalyzed, selectedRunIdForAnalysis]);
 
+  const handleStatusFilterChange = useCallback((nextStatus: ExecutionStatus | "ALL") => {
+    setPage(0);
+    setStatusFilter(nextStatus);
+  }, []);
+
+  const handleTaskTypeFilterChange = useCallback((nextTaskType: string) => {
+    setPage(0);
+    setTaskTypeFilter(nextTaskType);
+  }, []);
+
+  const applyTeamFilter = useCallback(() => {
+    setPage(0);
+    setTeamFilter(teamDraft.trim());
+  }, [teamDraft]);
+
+  const clearFilters = useCallback(() => {
+    setPage(0);
+    setStatusFilter("ALL");
+    setTaskTypeFilter("ALL");
+    setTeamFilter("");
+    setTeamDraft("");
+  }, []);
+
   return (
     <main className="ledger-shell">
       <header className="masthead">
@@ -247,27 +321,25 @@ export default function App() {
               <h1 id="runs-heading">Review by exception</h1>
             </div>
             <div className="toolbar-actions">
-              <div className="status-filter" aria-label="Status filter" role="group">
-                {statusFilters.map((filter) => (
-                  <button
-                    aria-pressed={statusFilter === filter.value}
-                    className={statusFilter === filter.value ? "active" : ""}
-                    key={filter.value}
-                    type="button"
-                    onClick={() => {
-                      setPage(0);
-                      setStatusFilter(filter.value);
-                    }}
-                  >
-                    {filter.label}
-                  </button>
-                ))}
-              </div>
               <button className="quiet-button" type="button" onClick={() => void loadDashboard()}>
                 Refresh
               </button>
             </div>
           </div>
+
+          <RunFilters
+            statusFilter={statusFilter}
+            taskProfileError={taskProfileError}
+            taskProfiles={taskProfiles}
+            taskTypeFilter={taskTypeFilter}
+            teamDraft={teamDraft}
+            teamFilter={teamFilter}
+            onApplyTeamFilter={applyTeamFilter}
+            onClearFilters={clearFilters}
+            onStatusFilterChange={handleStatusFilterChange}
+            onTaskTypeFilterChange={handleTaskTypeFilterChange}
+            onTeamDraftChange={setTeamDraft}
+          />
 
           <SimulatorDock
             error={scenarioError}
@@ -328,6 +400,106 @@ export default function App() {
         />
       </section>
     </main>
+  );
+}
+
+function RunFilters({
+  onApplyTeamFilter,
+  onClearFilters,
+  onStatusFilterChange,
+  onTaskTypeFilterChange,
+  onTeamDraftChange,
+  statusFilter,
+  taskProfileError,
+  taskProfiles,
+  taskTypeFilter,
+  teamDraft,
+  teamFilter
+}: {
+  onApplyTeamFilter: () => void;
+  onClearFilters: () => void;
+  onStatusFilterChange: (status: ExecutionStatus | "ALL") => void;
+  onTaskTypeFilterChange: (taskType: string) => void;
+  onTeamDraftChange: (team: string) => void;
+  statusFilter: ExecutionStatus | "ALL";
+  taskProfileError: string | null;
+  taskProfiles: TaskProfileResponse[];
+  taskTypeFilter: string;
+  teamDraft: string;
+  teamFilter: string;
+}) {
+  const taskTypes = Array.from(new Set(taskProfiles.map((profile) => profile.taskType))).sort();
+  const hasActiveFilters = statusFilter !== "ALL" || taskTypeFilter !== "ALL" || teamFilter.length > 0;
+  const hasDraftTeamChange = teamDraft.trim() !== teamFilter;
+
+  return (
+    <form
+      className="filter-strip"
+      onSubmit={(event) => {
+        event.preventDefault();
+        onApplyTeamFilter();
+      }}
+    >
+      <div className="filter-field">
+        <span>Status</span>
+        <div className="status-filter" aria-label="Status filter" role="group">
+          {statusFilters.map((filter) => (
+            <button
+              aria-pressed={statusFilter === filter.value}
+              className={statusFilter === filter.value ? "active" : ""}
+              key={filter.value}
+              type="button"
+              onClick={() => onStatusFilterChange(filter.value)}
+            >
+              {filter.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <label className="filter-field">
+        <span>Task</span>
+        <select value={taskTypeFilter} onChange={(event) => onTaskTypeFilterChange(event.target.value)}>
+          <option value="ALL">All task types</option>
+          {taskTypes.map((taskType) => (
+            <option key={taskType} value={taskType}>
+              {formatEnum(taskType)}
+            </option>
+          ))}
+        </select>
+      </label>
+
+      <label className="filter-field">
+        <span>Team</span>
+        <input
+          placeholder="demo"
+          value={teamDraft}
+          onChange={(event) => onTeamDraftChange(event.target.value)}
+        />
+      </label>
+
+      <div className="filter-actions">
+        <button className="quiet-button" type="submit" disabled={!hasDraftTeamChange}>
+          Apply
+        </button>
+        <button
+          className="quiet-button"
+          type="button"
+          disabled={!hasActiveFilters && teamDraft.length === 0}
+          onClick={onClearFilters}
+        >
+          Clear
+        </button>
+      </div>
+
+      <span className={taskProfileError ? "filter-message error" : "filter-message"}>
+        {taskProfileError
+          ? `Task profiles unavailable: ${taskProfileError}`
+          : hasActiveFilters
+          ? activeFilterLabel(statusFilter, taskTypeFilter, teamFilter)
+          : "Showing all audited runs"}
+      </span>
+    </form>
   );
 }
 
@@ -756,6 +928,20 @@ function formatClassification(classification: AnalysisClassification | null) {
   }
 
   return formatEnum(classification);
+}
+
+function activeFilterLabel(
+  statusFilter: ExecutionStatus | "ALL",
+  taskTypeFilter: string,
+  teamFilter: string
+) {
+  const activeFilters = [
+    statusFilter === "ALL" ? null : `status ${formatEnum(statusFilter)}`,
+    taskTypeFilter === "ALL" ? null : `task ${formatEnum(taskTypeFilter)}`,
+    teamFilter.length === 0 ? null : `team ${teamFilter}`
+  ].filter(Boolean);
+
+  return `Filtered by ${activeFilters.join(" / ")}`;
 }
 
 function formatEnum(value: string) {

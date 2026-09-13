@@ -304,6 +304,61 @@ h2 {
   background: var(--surface);
 }
 
+.filter-strip {
+  display: grid;
+  grid-template-columns: minmax(220px, auto) minmax(170px, 0.8fr) minmax(170px, 0.8fr) auto;
+  gap: 10px;
+  align-items: end;
+  padding: 0 0 18px;
+}
+
+.filter-field {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+
+.filter-field span {
+  color: var(--quiet);
+  font-size: 0.72rem;
+  font-weight: 650;
+  text-transform: uppercase;
+}
+
+.filter-field select,
+.filter-field input {
+  width: 100%;
+  min-height: 34px;
+  border: 1px solid var(--line);
+  border-radius: 0;
+  background: var(--surface);
+  color: var(--ink);
+  font-size: 0.84rem;
+  outline: none;
+  padding: 0 10px;
+}
+
+.filter-field select:focus,
+.filter-field input:focus {
+  border-color: var(--line-strong);
+  box-shadow: inset 0 -2px 0 var(--green);
+}
+
+.filter-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.filter-message {
+  grid-column: 1 / -1;
+  color: var(--quiet);
+  font-size: 0.78rem;
+}
+
+.filter-message.error {
+  color: var(--red);
+}
+
 .simulator-dock {
   display: grid;
   gap: 12px;
@@ -741,6 +796,18 @@ h2 {
     align-items: stretch;
     flex-direction: column;
     width: 100%;
+  }
+
+  .filter-strip {
+    grid-template-columns: 1fr;
+  }
+
+  .filter-actions {
+    width: 100%;
+  }
+
+  .filter-actions .quiet-button {
+    flex: 1 1 0;
   }
 
   .status-filter {

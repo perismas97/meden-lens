@@ -106,6 +106,23 @@ export interface RunListItemResponse {
   };
 }
 
+export interface TaskProfileResponse {
+  id: string;
+  taskType: string;
+  complexity: string;
+  maxModelCalls: number;
+  maxToolCalls: number;
+  recommendedInputTokens: number;
+  recommendedOutputTokens: number;
+  recommendedTotalTokens: number;
+  recommendedDurationMs: number;
+  recommendedCostUsd: string;
+  maxRetries: number;
+  allowSubAgents: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface AnalysisResponse {
   id: string;
   runId: string;
