@@ -64,6 +64,7 @@ export default function App() {
   const [isLoading, setIsLoading] = useState(true);
   const [isLoadingAnalysis, setIsLoadingAnalysis] = useState(false);
   const [isLoadingScenarios, setIsLoadingScenarios] = useState(true);
+  const [isLoadingTaskProfiles, setIsLoadingTaskProfiles] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [analysisError, setAnalysisError] = useState<string | null>(null);
   const [scenarioError, setScenarioError] = useState<string | null>(null);
@@ -133,6 +134,7 @@ export default function App() {
   }, [loadDashboard]);
 
   const loadTaskProfiles = useCallback(async (signal?: AbortSignal) => {
+    setIsLoadingTaskProfiles(true);
     setTaskProfileError(null);
 
     try {
@@ -143,6 +145,10 @@ export default function App() {
       }
 
       setTaskProfileError(profilesError instanceof Error ? profilesError.message : "Request failed");
+    } finally {
+      if (!signal?.aborted) {
+        setIsLoadingTaskProfiles(false);
+      }
     }
   }, []);
 
@@ -313,6 +319,12 @@ export default function App() {
         ))}
       </section>
 
+      <TaskProfileBudgetView
+        error={taskProfileError}
+        isLoading={isLoadingTaskProfiles}
+        taskProfiles={taskProfiles}
+      />
+
       <section className="workbench">
         <section className="ledger-region" aria-labelledby="runs-heading">
           <div className="ledger-toolbar">
@@ -400,6 +412,81 @@ export default function App() {
         />
       </section>
     </main>
+  );
+}
+
+function TaskProfileBudgetView({
+  error,
+  isLoading,
+  taskProfiles
+}: {
+  error: string | null;
+  isLoading: boolean;
+  taskProfiles: TaskProfileResponse[];
+}) {
+  return (
+    <section className="budget-reference" aria-labelledby="budget-reference-heading">
+      <div className="budget-reference-heading">
+        <div>
+          <p className="eyebrow">Scoring Reference</p>
+          <h2 id="budget-reference-heading">Task profile budgets</h2>
+        </div>
+        <span>Recommended targets and execution ceilings</span>
+      </div>
+
+      {error ? (
+        <span className="budget-reference-state error">Task profiles unavailable: {error}</span>
+      ) : null}
+
+      {isLoading ? <span className="budget-reference-state">Loading task profiles</span> : null}
+
+      {!isLoading && !error && taskProfiles.length === 0 ? (
+        <span className="budget-reference-state">No task profiles configured</span>
+      ) : null}
+
+      {!isLoading && !error && taskProfiles.length > 0 ? (
+        <div className="budget-table-scroll">
+          <table className="budget-table">
+            <thead>
+              <tr>
+                <th>Task profile</th>
+                <th>Token target</th>
+                <th>Cost target</th>
+                <th>Duration target</th>
+                <th>Call ceilings</th>
+                <th>Retry ceiling</th>
+                <th>Sub-agents</th>
+              </tr>
+            </thead>
+            <tbody>
+              {taskProfiles.map((profile) => (
+                <tr key={profile.id}>
+                  <td>
+                    <strong>{formatEnum(profile.taskType)}</strong>
+                    <small>{formatEnum(profile.complexity)} complexity</small>
+                  </td>
+                  <td>
+                    <strong>{formatCount(profile.recommendedTotalTokens)}</strong>
+                    <small>
+                      {formatCount(profile.recommendedInputTokens)} in /{" "}
+                      {formatCount(profile.recommendedOutputTokens)} out
+                    </small>
+                  </td>
+                  <td className="budget-mono">{formatMoney(profile.recommendedCostUsd)}</td>
+                  <td className="budget-mono">{formatDuration(profile.recommendedDurationMs)}</td>
+                  <td>
+                    <strong>{formatCount(profile.maxModelCalls)} model</strong>
+                    <small>{formatCount(profile.maxToolCalls)} tool</small>
+                  </td>
+                  <td className="budget-mono">{formatCount(profile.maxRetries)}</td>
+                  <td>{profile.allowSubAgents ? "Allowed" : "Not allowed"}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ) : null}
+    </section>
   );
 }
 
