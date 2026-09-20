@@ -49,6 +49,15 @@ interface SummarySignal {
   value: string;
 }
 
+interface ComparisonMetric {
+  actual: number;
+  actualLabel: string;
+  expected: number;
+  expectedLabel: string;
+  kind: "ceiling" | "target";
+  label: string;
+}
+
 export default function App() {
   const [summary, setSummary] = useState<RunSummaryResponse | null>(null);
   const [runs, setRuns] = useState<RunPageResponse | null>(null);
@@ -219,6 +228,13 @@ export default function App() {
   const selectedRun = useMemo(
     () => items.find((run) => run.id === selectedRunId) ?? items[0] ?? null,
     [items, selectedRunId]
+  );
+  const selectedTaskProfile = useMemo(
+    () =>
+      selectedRun
+        ? taskProfiles.find((profile) => profile.taskType === selectedRun.task.type) ?? null
+        : null,
+    [selectedRun, taskProfiles]
   );
   const selectedRunIdForAnalysis = selectedRun?.id ?? null;
   const selectedRunAnalyzed = selectedRun?.analysis.analyzed ?? false;
@@ -409,6 +425,7 @@ export default function App() {
           isLoadingAnalysis={isLoadingAnalysis}
           run={selectedRun}
           summary={summary}
+          taskProfile={selectedTaskProfile}
         />
       </section>
     </main>
@@ -715,13 +732,15 @@ function RunInspector({
   analysisError,
   isLoadingAnalysis,
   run,
-  summary
+  summary,
+  taskProfile
 }: {
   analysis: AnalysisResponse | null;
   analysisError: string | null;
   isLoadingAnalysis: boolean;
   run: RunListItemResponse | null;
   summary: RunSummaryResponse | null;
+  taskProfile: TaskProfileResponse | null;
 }) {
   if (!run) {
     return (
@@ -750,13 +769,9 @@ function RunInspector({
       <dl className="fact-list">
         <Fact label="Task" value={run.task.type} />
         <Fact label="Status" value={run.execution.status.toLowerCase()} />
-        <Fact label="Duration" value={formatDuration(run.execution.durationMs)} />
-        <Fact label="Tokens" value={formatCount(run.execution.totalTokens)} />
-        <Fact label="Model calls" value={formatCount(run.execution.modelCalls)} />
-        <Fact label="Tool calls" value={formatCount(run.execution.toolCalls)} />
-        <Fact label="Retries" value={formatCount(run.execution.retryCount)} />
-        <Fact label="Cost" value={formatMoney(run.execution.estimatedCostUsd)} />
       </dl>
+
+      <MetricComparison run={run} taskProfile={taskProfile} />
 
       <AnalysisDetail
         analysis={analysis}
@@ -765,6 +780,64 @@ function RunInspector({
         isLoading={isLoadingAnalysis}
       />
     </aside>
+  );
+}
+
+function MetricComparison({
+  run,
+  taskProfile
+}: {
+  run: RunListItemResponse;
+  taskProfile: TaskProfileResponse | null;
+}) {
+  if (!taskProfile) {
+    return (
+      <section className="metric-comparison" aria-label="Actual versus expected metrics">
+        <div className="section-heading">
+          <span>Actual vs expected</span>
+        </div>
+        <p className="analysis-empty">No matching task profile is available for this run.</p>
+      </section>
+    );
+  }
+
+  const metrics = buildComparisonMetrics(run, taskProfile);
+
+  return (
+    <section className="metric-comparison" aria-labelledby="metric-comparison-heading">
+      <div className="section-heading">
+        <span id="metric-comparison-heading">Actual vs expected</span>
+        <small>{formatEnum(taskProfile.taskType)}</small>
+      </div>
+
+      <div className="comparison-list">
+        {metrics.map((metric) => {
+          const tone = comparisonTone(metric.actual, metric.expected);
+
+          return (
+            <article className={`comparison-row ${tone}`} key={metric.label}>
+              <div className="comparison-heading">
+                <span>{metric.label}</span>
+                <small>{comparisonRatioLabel(metric.actual, metric.expected)}</small>
+              </div>
+              <div className="comparison-values">
+                <span>
+                  <small>Actual</small>
+                  <strong>{metric.actualLabel}</strong>
+                </span>
+                <span>
+                  <small>{metric.kind === "target" ? "Target" : "Ceiling"}</small>
+                  <strong>{metric.expectedLabel}</strong>
+                </span>
+              </div>
+              <div className="comparison-track" aria-hidden="true">
+                <span style={{ width: `${comparisonMeterWidth(metric.actual, metric.expected)}%` }} />
+              </div>
+            </article>
+          );
+        })}
+      </div>
+    </section>
   );
 }
 
@@ -1007,6 +1080,94 @@ function formatDuration(durationMs: number) {
   }
 
   return `${Math.floor(seconds / 60)}m ${seconds % 60}s`;
+}
+
+function buildComparisonMetrics(
+  run: RunListItemResponse,
+  taskProfile: TaskProfileResponse
+): ComparisonMetric[] {
+  const actualCost = Number(run.execution.estimatedCostUsd);
+  const expectedCost = Number(taskProfile.recommendedCostUsd);
+
+  return [
+    {
+      actual: run.execution.totalTokens,
+      actualLabel: formatCount(run.execution.totalTokens),
+      expected: taskProfile.recommendedTotalTokens,
+      expectedLabel: formatCount(taskProfile.recommendedTotalTokens),
+      kind: "target",
+      label: "Tokens"
+    },
+    {
+      actual: Number.isFinite(actualCost) ? actualCost : 0,
+      actualLabel: formatMoney(actualCost),
+      expected: Number.isFinite(expectedCost) ? expectedCost : 0,
+      expectedLabel: formatMoney(expectedCost),
+      kind: "target",
+      label: "Cost"
+    },
+    {
+      actual: run.execution.durationMs,
+      actualLabel: formatDuration(run.execution.durationMs),
+      expected: taskProfile.recommendedDurationMs,
+      expectedLabel: formatDuration(taskProfile.recommendedDurationMs),
+      kind: "target",
+      label: "Duration"
+    },
+    {
+      actual: run.execution.modelCalls,
+      actualLabel: formatCount(run.execution.modelCalls),
+      expected: taskProfile.maxModelCalls,
+      expectedLabel: formatCount(taskProfile.maxModelCalls),
+      kind: "ceiling",
+      label: "Model calls"
+    },
+    {
+      actual: run.execution.toolCalls,
+      actualLabel: formatCount(run.execution.toolCalls),
+      expected: taskProfile.maxToolCalls,
+      expectedLabel: formatCount(taskProfile.maxToolCalls),
+      kind: "ceiling",
+      label: "Tool calls"
+    },
+    {
+      actual: run.execution.retryCount,
+      actualLabel: formatCount(run.execution.retryCount),
+      expected: taskProfile.maxRetries,
+      expectedLabel: formatCount(taskProfile.maxRetries),
+      kind: "ceiling",
+      label: "Retries"
+    }
+  ];
+}
+
+function comparisonTone(actual: number, expected: number) {
+  if (expected === 0) {
+    return actual === 0 ? "within" : "critical";
+  }
+
+  const ratio = actual / expected;
+  if (ratio <= 1) {
+    return "within";
+  }
+
+  return ratio <= 1.25 ? "over" : "critical";
+}
+
+function comparisonRatioLabel(actual: number, expected: number) {
+  if (expected === 0) {
+    return actual === 0 ? "within limit" : "not allowed";
+  }
+
+  return `${(actual / expected).toFixed(1)}x`;
+}
+
+function comparisonMeterWidth(actual: number, expected: number) {
+  if (expected === 0) {
+    return actual === 0 ? 0 : 100;
+  }
+
+  return Math.min(100, Math.max(0, (actual / expected) * 50));
 }
 
 function formatClassification(classification: AnalysisClassification | null) {

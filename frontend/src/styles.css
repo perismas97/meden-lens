@@ -717,6 +717,113 @@ h2 {
   text-align: right;
 }
 
+.metric-comparison {
+  display: grid;
+  gap: 10px;
+  margin-top: 20px;
+  padding-top: 18px;
+  border-top: 1px solid var(--line);
+}
+
+.comparison-list {
+  display: grid;
+  border-top: 1px solid #e5e9e1;
+}
+
+.comparison-row {
+  display: grid;
+  gap: 8px;
+  padding: 11px 0 12px;
+  border-bottom: 1px solid #e5e9e1;
+}
+
+.comparison-heading,
+.comparison-values {
+  display: flex;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.comparison-heading {
+  align-items: baseline;
+}
+
+.comparison-heading > span {
+  color: var(--ink);
+  font-size: 0.82rem;
+  font-weight: 650;
+}
+
+.comparison-heading > small {
+  color: var(--green);
+  font-family: "Cascadia Code", "SFMono-Regular", Consolas, monospace;
+  font-size: 0.74rem;
+}
+
+.comparison-row.over .comparison-heading > small {
+  color: var(--amber);
+}
+
+.comparison-row.critical .comparison-heading > small {
+  color: var(--red);
+}
+
+.comparison-values > span {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.comparison-values > span:last-child {
+  text-align: right;
+}
+
+.comparison-values small {
+  color: var(--quiet);
+  font-size: 0.68rem;
+  text-transform: uppercase;
+}
+
+.comparison-values strong {
+  overflow-wrap: anywhere;
+  color: var(--ink);
+  font-family: "Cascadia Code", "SFMono-Regular", Consolas, monospace;
+  font-size: 0.82rem;
+  font-weight: 650;
+}
+
+.comparison-track {
+  position: relative;
+  overflow: hidden;
+  height: 3px;
+  background: #e4e8df;
+}
+
+.comparison-track::after {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 50%;
+  width: 1px;
+  background: var(--ink);
+  content: "";
+  opacity: 0.55;
+}
+
+.comparison-track > span {
+  display: block;
+  height: 100%;
+  background: var(--green);
+}
+
+.comparison-row.over .comparison-track > span {
+  background: var(--amber);
+}
+
+.comparison-row.critical .comparison-track > span {
+  background: var(--red);
+}
+
 .analysis-detail {
   display: grid;
   gap: 20px;
