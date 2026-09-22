@@ -629,7 +629,9 @@ function SimulatorDock({
           <p className="eyebrow">Simulator</p>
           <h2 id="simulator-heading">Synthetic runs</h2>
         </div>
-        {notice ? <span className="simulator-note">{notice}</span> : null}
+        <span className="simulator-note">
+          {notice ?? "Each scenario isolates one scoring decision"}
+        </span>
       </div>
 
       {error ? <span className="simulator-error">Simulator unavailable: {error}</span> : null}
@@ -644,9 +646,16 @@ function SimulatorDock({
         <div className="scenario-grid">
           {scenarios.map((scenario) => (
             <article className="scenario-row" key={scenario.key}>
-              <div>
+              <div className="scenario-identity">
                 <strong>{scenario.name}</strong>
-                <span>{scenario.expectedSignal}</span>
+                <code>{scenario.key}</code>
+              </div>
+              <div className="scenario-purpose">
+                <p>{scenario.description}</p>
+                <span>
+                  <b>Product signal</b>
+                  {scenario.expectedSignal}
+                </span>
               </div>
               <button
                 className="quiet-button"

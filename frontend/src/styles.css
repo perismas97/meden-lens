@@ -482,11 +482,11 @@ h2 {
 
 .scenario-row {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  gap: 12px;
+  grid-template-columns: minmax(170px, 0.7fr) minmax(320px, 1.5fr) auto;
+  gap: 20px;
   align-items: center;
   min-width: 0;
-  padding: 12px 14px;
+  padding: 14px;
   border-bottom: 1px solid var(--line);
 }
 
@@ -494,24 +494,54 @@ h2 {
   border-bottom: 0;
 }
 
-.scenario-row strong,
-.scenario-row span {
+.scenario-identity strong,
+.scenario-identity code {
   display: block;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.scenario-row strong {
+.scenario-identity strong {
   color: var(--ink);
   font-size: 0.88rem;
   font-weight: 650;
 }
 
-.scenario-row span {
-  margin-top: 3px;
-  color: var(--muted);
+.scenario-identity code {
+  margin-top: 4px;
+  color: var(--quiet);
+  font-family: "Cascadia Code", "SFMono-Regular", Consolas, monospace;
+  font-size: 0.68rem;
+}
+
+.scenario-purpose {
+  display: grid;
+  gap: 7px;
+  min-width: 0;
+}
+
+.scenario-purpose p,
+.scenario-purpose span {
+  margin: 0;
   font-size: 0.78rem;
+  line-height: 1.4;
+}
+
+.scenario-purpose p {
+  color: var(--muted);
+}
+
+.scenario-purpose span {
+  color: var(--ink);
+}
+
+.scenario-purpose b {
+  margin-right: 7px;
+  color: var(--green);
+  font-size: 0.68rem;
+  font-weight: 700;
+  text-transform: uppercase;
 }
 
 .table-scroll {
@@ -1024,6 +1054,11 @@ h2 {
 
   .scenario-row {
     grid-template-columns: 1fr;
+    gap: 12px;
+  }
+
+  .scenario-row .quiet-button {
+    justify-self: start;
   }
 }
 
