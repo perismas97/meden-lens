@@ -75,9 +75,12 @@ export default function App() {
   const [isLoadingScenarios, setIsLoadingScenarios] = useState(true);
   const [isLoadingTaskProfiles, setIsLoadingTaskProfiles] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [isBackendOffline, setIsBackendOffline] = useState(false);
   const [analysisError, setAnalysisError] = useState<string | null>(null);
-  const [scenarioError, setScenarioError] = useState<string | null>(null);
+  const [scenarioLoadError, setScenarioLoadError] = useState<string | null>(null);
+  const [simulationError, setSimulationError] = useState<string | null>(null);
   const [taskProfileError, setTaskProfileError] = useState<string | null>(null);
+  const [analysisRetryKey, setAnalysisRetryKey] = useState(0);
   const [runningScenarioKey, setRunningScenarioKey] = useState<string | null>(null);
   const [simulationNotice, setSimulationNotice] = useState<string | null>(null);
 
@@ -97,6 +100,7 @@ export default function App() {
     } = {}) => {
       setIsLoading(true);
       setError(null);
+      setIsBackendOffline(false);
 
       const requestedPage = pageOverride ?? page;
       const requestedStatus = statusOverride ?? statusFilter;
@@ -125,7 +129,8 @@ export default function App() {
           return;
         }
 
-        setError(dashboardError instanceof Error ? dashboardError.message : "Request failed");
+        setIsBackendOffline(isConnectionFailure(dashboardError));
+        setError(requestFailureMessage(dashboardError));
       } finally {
         if (!signal?.aborted) {
           setIsLoading(false);
@@ -153,7 +158,7 @@ export default function App() {
         return;
       }
 
-      setTaskProfileError(profilesError instanceof Error ? profilesError.message : "Request failed");
+      setTaskProfileError(requestFailureMessage(profilesError));
     } finally {
       if (!signal?.aborted) {
         setIsLoadingTaskProfiles(false);
@@ -170,7 +175,7 @@ export default function App() {
 
   const loadScenarios = useCallback(async (signal?: AbortSignal) => {
     setIsLoadingScenarios(true);
-    setScenarioError(null);
+    setScenarioLoadError(null);
 
     try {
       setScenarios(await fetchSimulatorScenarios(signal));
@@ -179,7 +184,7 @@ export default function App() {
         return;
       }
 
-      setScenarioError(scenariosError instanceof Error ? scenariosError.message : "Request failed");
+      setScenarioLoadError(requestFailureMessage(scenariosError));
     } finally {
       if (!signal?.aborted) {
         setIsLoadingScenarios(false);
@@ -197,7 +202,7 @@ export default function App() {
   const handleCreateScenarioRun = useCallback(
     async (scenario: SimulatorScenarioResponse) => {
       setRunningScenarioKey(scenario.key);
-      setScenarioError(null);
+      setSimulationError(null);
       setSimulationNotice(null);
 
       try {
@@ -216,7 +221,7 @@ export default function App() {
         });
         setSelectedRunId(simulatedRun.run.id);
       } catch (simulationError) {
-        setScenarioError(simulationError instanceof Error ? simulationError.message : "Request failed");
+        setSimulationError(requestFailureMessage(simulationError));
       } finally {
         setRunningScenarioKey(null);
       }
@@ -239,7 +244,9 @@ export default function App() {
   const selectedRunIdForAnalysis = selectedRun?.id ?? null;
   const selectedRunAnalyzed = selectedRun?.analysis.analyzed ?? false;
   const metrics = useMemo(() => buildMetrics(summary), [summary]);
-  const backendState = error ? "offline" : isLoading ? "loading" : "ready";
+  const backendState = isBackendOffline ? "offline" : error ? "degraded" : isLoading ? "loading" : "ready";
+  const hasActiveFilters =
+    statusFilter !== "ALL" || taskTypeFilter !== "ALL" || teamFilter.length > 0;
 
   useEffect(() => {
     if (items.length === 0 && selectedRunId !== null) {
@@ -282,7 +289,7 @@ export default function App() {
       });
 
     return () => controller.abort();
-  }, [selectedRunAnalyzed, selectedRunIdForAnalysis]);
+  }, [analysisRetryKey, selectedRunAnalyzed, selectedRunIdForAnalysis]);
 
   const handleStatusFilterChange = useCallback((nextStatus: ExecutionStatus | "ALL") => {
     setPage(0);
@@ -316,7 +323,7 @@ export default function App() {
         </div>
         <div className={`runtime ${backendState}`}>
           <span aria-hidden="true" />
-          <strong>{error ? "offline" : isLoading ? "syncing" : "ready"}</strong>
+          <strong>{backendState === "loading" ? "syncing" : backendState}</strong>
           <code>{apiHostLabel()}</code>
         </div>
       </header>
@@ -338,6 +345,7 @@ export default function App() {
       <TaskProfileBudgetView
         error={taskProfileError}
         isLoading={isLoadingTaskProfiles}
+        onRetry={() => void loadTaskProfiles()}
         taskProfiles={taskProfiles}
       />
 
@@ -370,22 +378,51 @@ export default function App() {
           />
 
           <SimulatorDock
-            error={scenarioError}
+            catalogError={scenarioLoadError}
             isLoading={isLoadingScenarios}
             notice={simulationNotice}
+            onRetry={() => void loadScenarios()}
             runningScenarioKey={runningScenarioKey}
             scenarios={scenarios}
+            simulationError={simulationError}
             onRun={handleCreateScenarioRun}
           />
 
-          {error ? <RequestState tone="error" title="API unavailable" detail={error} /> : null}
+          {error ? (
+            <RequestState
+              actionLabel="Retry"
+              detail={
+                isBackendOffline
+                  ? `No response from ${apiHostLabel()}. Confirm that the backend is running and try again.`
+                  : `The API request failed: ${error}`
+              }
+              eyebrow={isBackendOffline ? "Connection" : "Request failed"}
+              onAction={() => void loadDashboard()}
+              tone="error"
+              title={isBackendOffline ? "Backend unavailable" : "Run data unavailable"}
+            />
+          ) : null}
 
           {!error && isLoading ? (
-            <RequestState title="Loading ledger" detail="Fetching latest summary and runs." />
+            <RequestState
+              detail="Fetching the latest run summary and execution records."
+              eyebrow="Synchronizing"
+              title="Loading run ledger"
+            />
           ) : null}
 
           {!error && !isLoading && items.length === 0 ? (
-            <RequestState title="No executions" detail="The selected queue is empty." />
+            <RequestState
+              actionLabel={hasActiveFilters ? "Clear filters" : undefined}
+              detail={
+                hasActiveFilters
+                  ? "No recorded runs satisfy the current status, task, and team filters."
+                  : "No execution runs have been recorded yet. Simulator runs and API submissions will appear here."
+              }
+              eyebrow={hasActiveFilters ? "Filtered queue" : "Empty ledger"}
+              onAction={hasActiveFilters ? clearFilters : undefined}
+              title={hasActiveFilters ? "No runs match these filters" : "No runs recorded"}
+            />
           ) : null}
 
           {!error && !isLoading && items.length > 0 ? (
@@ -423,6 +460,7 @@ export default function App() {
           analysis={analysisDetails}
           analysisError={analysisError}
           isLoadingAnalysis={isLoadingAnalysis}
+          onRetryAnalysis={() => setAnalysisRetryKey((currentKey) => currentKey + 1)}
           run={selectedRun}
           summary={summary}
           taskProfile={selectedTaskProfile}
@@ -435,10 +473,12 @@ export default function App() {
 function TaskProfileBudgetView({
   error,
   isLoading,
+  onRetry,
   taskProfiles
 }: {
   error: string | null;
   isLoading: boolean;
+  onRetry: () => void;
   taskProfiles: TaskProfileResponse[];
 }) {
   return (
@@ -452,7 +492,15 @@ function TaskProfileBudgetView({
       </div>
 
       {error ? (
-        <span className="budget-reference-state error">Task profiles unavailable: {error}</span>
+        <div className="inline-failure budget-reference-state">
+          <span>
+            <strong>Task profiles unavailable</strong>
+            {error}
+          </span>
+          <button className="quiet-button" type="button" onClick={onRetry}>
+            Retry
+          </button>
+        </div>
       ) : null}
 
       {isLoading ? <span className="budget-reference-state">Loading task profiles</span> : null}
@@ -608,19 +656,23 @@ function RunFilters({
 }
 
 function SimulatorDock({
-  error,
+  catalogError,
   isLoading,
   notice,
+  onRetry,
   onRun,
   runningScenarioKey,
-  scenarios
+  scenarios,
+  simulationError
 }: {
-  error: string | null;
+  catalogError: string | null;
   isLoading: boolean;
   notice: string | null;
+  onRetry: () => void;
   onRun: (scenario: SimulatorScenarioResponse) => void;
   runningScenarioKey: string | null;
   scenarios: SimulatorScenarioResponse[];
+  simulationError: string | null;
 }) {
   return (
     <section className="simulator-dock" aria-labelledby="simulator-heading">
@@ -634,15 +686,29 @@ function SimulatorDock({
         </span>
       </div>
 
-      {error ? <span className="simulator-error">Simulator unavailable: {error}</span> : null}
+      {catalogError ? (
+        <div className="inline-failure">
+          <span>
+            <strong>Scenario catalog unavailable</strong>
+            {catalogError}
+          </span>
+          <button className="quiet-button" type="button" onClick={onRetry}>
+            Retry
+          </button>
+        </div>
+      ) : null}
+
+      {simulationError ? (
+        <span className="simulator-error">Scenario run failed: {simulationError}. Run it again to retry.</span>
+      ) : null}
 
       {isLoading ? <span className="simulator-muted">Loading scenarios</span> : null}
 
-      {!isLoading && !error && scenarios.length === 0 ? (
+      {!isLoading && !catalogError && scenarios.length === 0 ? (
         <span className="simulator-muted">No scenarios available</span>
       ) : null}
 
-      {!isLoading && scenarios.length > 0 ? (
+      {!isLoading && !catalogError && scenarios.length > 0 ? (
         <div className="scenario-grid">
           {scenarios.map((scenario) => (
             <article className="scenario-row" key={scenario.key}>
@@ -740,6 +806,7 @@ function RunInspector({
   analysis,
   analysisError,
   isLoadingAnalysis,
+  onRetryAnalysis,
   run,
   summary,
   taskProfile
@@ -747,6 +814,7 @@ function RunInspector({
   analysis: AnalysisResponse | null;
   analysisError: string | null;
   isLoadingAnalysis: boolean;
+  onRetryAnalysis: () => void;
   run: RunListItemResponse | null;
   summary: RunSummaryResponse | null;
   taskProfile: TaskProfileResponse | null;
@@ -787,6 +855,7 @@ function RunInspector({
         error={analysisError}
         isAnalyzed={run.analysis.analyzed}
         isLoading={isLoadingAnalysis}
+        onRetry={onRetryAnalysis}
       />
     </aside>
   );
@@ -854,12 +923,14 @@ function AnalysisDetail({
   analysis,
   error,
   isAnalyzed,
-  isLoading
+  isLoading,
+  onRetry
 }: {
   analysis: AnalysisResponse | null;
   error: string | null;
   isAnalyzed: boolean;
   isLoading: boolean;
+  onRetry: () => void;
 }) {
   if (!isAnalyzed) {
     return (
@@ -880,7 +951,15 @@ function AnalysisDetail({
   if (error) {
     return (
       <section className="analysis-detail" aria-label="Analysis details">
-        <p className="analysis-empty error">Analysis unavailable: {error}</p>
+        <div className="inline-failure">
+          <span>
+            <strong>Analysis unavailable</strong>
+            {error}
+          </span>
+          <button className="quiet-button" type="button" onClick={onRetry}>
+            Retry
+          </button>
+        </div>
       </section>
     );
   }
@@ -965,20 +1044,46 @@ function Fact({ label, value }: { label: string; value: string }) {
 }
 
 function RequestState({
+  actionLabel,
   detail,
+  eyebrow,
+  onAction,
   title,
   tone = "muted"
 }: {
+  actionLabel?: string;
   detail: string;
+  eyebrow: string;
+  onAction?: () => void;
   title: string;
   tone?: "muted" | "error";
 }) {
   return (
     <div className={`request-state ${tone}`}>
-      <strong>{title}</strong>
-      <span>{detail}</span>
+      <div>
+        <small>{eyebrow}</small>
+        <strong>{title}</strong>
+        <span>{detail}</span>
+      </div>
+      {actionLabel && onAction ? (
+        <button className="quiet-button" type="button" onClick={onAction}>
+          {actionLabel}
+        </button>
+      ) : null}
     </div>
   );
+}
+
+function isConnectionFailure(requestError: unknown) {
+  return requestError instanceof TypeError;
+}
+
+function requestFailureMessage(requestError: unknown) {
+  if (isConnectionFailure(requestError)) {
+    return "Could not reach the backend service";
+  }
+
+  return requestError instanceof Error ? requestError.message : "Unexpected request failure";
 }
 
 function buildMetrics(summary: RunSummaryResponse | null): SummarySignal[] {

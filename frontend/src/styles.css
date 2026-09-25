@@ -106,6 +106,10 @@ button:disabled {
   background: var(--amber);
 }
 
+.runtime.degraded span {
+  background: var(--amber);
+}
+
 .runtime.offline span {
   background: var(--red);
 }
@@ -237,10 +241,6 @@ button:disabled {
   display: block;
   padding: 20px 0;
   border-top: 1px solid var(--line);
-}
-
-.budget-reference-state.error {
-  color: var(--red);
 }
 
 .budget-table-scroll {
@@ -474,6 +474,36 @@ h2 {
   color: var(--red);
 }
 
+.inline-failure {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  min-width: 0;
+  padding: 10px 12px;
+  border-left: 2px solid var(--red);
+  background: var(--red-fill);
+  color: var(--red);
+  font-size: 0.78rem;
+}
+
+.inline-failure > span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.inline-failure strong {
+  display: block;
+  margin-bottom: 2px;
+  color: var(--ink);
+  font-size: 0.8rem;
+}
+
+.inline-failure .quiet-button {
+  flex: 0 0 auto;
+  border-color: rgba(150, 59, 50, 0.3);
+}
+
 .scenario-grid {
   display: grid;
   border-top: 1px solid var(--line);
@@ -640,11 +670,27 @@ h2 {
 }
 
 .request-state {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 24px;
+  padding: 32px 0;
+  border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+  color: var(--muted);
+}
+
+.request-state > div {
   display: grid;
   gap: 5px;
-  padding: 40px 0;
-  border-top: 1px solid var(--line);
-  color: var(--muted);
+  max-width: 620px;
+}
+
+.request-state small {
+  color: var(--quiet);
+  font-size: 0.68rem;
+  font-weight: 700;
+  text-transform: uppercase;
 }
 
 .request-state strong {
@@ -652,8 +698,18 @@ h2 {
   font-size: 0.96rem;
 }
 
+.request-state span {
+  font-size: 0.82rem;
+  line-height: 1.45;
+}
+
 .request-state.error strong {
   color: var(--red);
+}
+
+.request-state.error {
+  border-top-color: rgba(150, 59, 50, 0.4);
+  border-bottom-color: rgba(150, 59, 50, 0.25);
 }
 
 .pagination-bar {
@@ -1033,6 +1089,17 @@ h2 {
 
   .filter-actions {
     width: 100%;
+  }
+
+  .inline-failure,
+  .request-state {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .inline-failure .quiet-button,
+  .request-state .quiet-button {
+    align-self: flex-start;
   }
 
   .filter-actions .quiet-button {
