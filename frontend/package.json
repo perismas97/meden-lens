@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "vite --host 0.0.0.0 --port 5173",
     "build": "tsc --noEmit && vite build",
+    "test": "node --experimental-strip-types --test src/api.test.mjs src/helpers.test.mjs",
     "preview": "vite preview --host 0.0.0.0 --port 4173"
   },
   "dependencies": {

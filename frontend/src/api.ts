@@ -1,7 +1,8 @@
 import { API_BASE_URL } from "./config";
+import { buildRunPageQuery } from "./run-page-query";
+import type { RunPageParams } from "./run-page-query";
 import type {
   AnalysisResponse,
-  ExecutionStatus,
   RunPageResponse,
   RunSummaryResponse,
   SimulatedRunResponse,
@@ -9,37 +10,12 @@ import type {
   TaskProfileResponse
 } from "./types";
 
-interface RunPageParams {
-  page: number;
-  size: number;
-  status: ExecutionStatus | "ALL";
-  taskType: string;
-  team: string;
-}
-
 export function fetchRunSummary(signal?: AbortSignal) {
   return getJson<RunSummaryResponse>("/api/v1/runs/summary", signal);
 }
 
 export function fetchRunPage(params: RunPageParams, signal?: AbortSignal) {
-  const query = new URLSearchParams({
-    page: String(params.page),
-    size: String(params.size),
-    sort: "createdAt,desc"
-  });
-
-  if (params.status !== "ALL") {
-    query.set("status", params.status);
-  }
-
-  if (params.taskType !== "ALL") {
-    query.set("taskType", params.taskType);
-  }
-
-  const team = params.team.trim();
-  if (team.length > 0) {
-    query.set("team", team);
-  }
+  const query = buildRunPageQuery(params);
 
   return getJson<RunPageResponse>(`/api/v1/runs?${query.toString()}`, signal);
 }

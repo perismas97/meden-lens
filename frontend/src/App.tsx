@@ -7,7 +7,13 @@ import {
   fetchSimulatorScenarios,
   fetchTaskProfiles
 } from "./api";
+import {
+  comparisonMeterWidth,
+  comparisonRatioLabel,
+  comparisonTone
+} from "./comparison";
 import { apiHostLabel } from "./config";
+import { formatCount, formatDate, formatDuration, formatEnum, formatMoney } from "./formatters";
 import type {
   AnalysisClassification,
   AnalysisResponse,
@@ -26,19 +32,6 @@ const statusFilters: Array<{ label: string; value: ExecutionStatus | "ALL" }> = 
   { label: "Success", value: "SUCCESS" },
   { label: "Failed", value: "FAILED" }
 ];
-
-const moneyFormatter = new Intl.NumberFormat("en-US", {
-  currency: "USD",
-  style: "currency"
-});
-
-const numberFormatter = new Intl.NumberFormat("en-US");
-const dateFormatter = new Intl.DateTimeFormat(undefined, {
-  day: "2-digit",
-  hour: "2-digit",
-  minute: "2-digit",
-  month: "short"
-});
 
 interface SummarySignal {
   detail: string;
@@ -1169,33 +1162,6 @@ function placeholderMetric(label: string): SummarySignal {
   };
 }
 
-function formatMoney(value: string | number | null | undefined) {
-  const amount = Number(value ?? 0);
-  return moneyFormatter.format(Number.isFinite(amount) ? amount : 0);
-}
-
-function formatCount(value: number) {
-  return numberFormatter.format(value);
-}
-
-function formatDate(value: string) {
-  const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? "-" : dateFormatter.format(date);
-}
-
-function formatDuration(durationMs: number) {
-  if (durationMs < 1000) {
-    return `${durationMs} ms`;
-  }
-
-  const seconds = Math.round(durationMs / 1000);
-  if (seconds < 60) {
-    return `${seconds} sec`;
-  }
-
-  return `${Math.floor(seconds / 60)}m ${seconds % 60}s`;
-}
-
 function buildComparisonMetrics(
   run: RunListItemResponse,
   taskProfile: TaskProfileResponse
@@ -1255,35 +1221,6 @@ function buildComparisonMetrics(
   ];
 }
 
-function comparisonTone(actual: number, expected: number) {
-  if (expected === 0) {
-    return actual === 0 ? "within" : "critical";
-  }
-
-  const ratio = actual / expected;
-  if (ratio <= 1) {
-    return "within";
-  }
-
-  return ratio <= 1.25 ? "over" : "critical";
-}
-
-function comparisonRatioLabel(actual: number, expected: number) {
-  if (expected === 0) {
-    return actual === 0 ? "within limit" : "not allowed";
-  }
-
-  return `${(actual / expected).toFixed(1)}x`;
-}
-
-function comparisonMeterWidth(actual: number, expected: number) {
-  if (expected === 0) {
-    return actual === 0 ? 0 : 100;
-  }
-
-  return Math.min(100, Math.max(0, (actual / expected) * 50));
-}
-
 function formatClassification(classification: AnalysisClassification | null) {
   if (!classification) {
     return "Not analyzed";
@@ -1304,14 +1241,6 @@ function activeFilterLabel(
   ].filter(Boolean);
 
   return `Filtered by ${activeFilters.join(" / ")}`;
-}
-
-function formatEnum(value: string) {
-  return value
-    .toLowerCase()
-    .split("_")
-    .map((word) => word[0].toUpperCase() + word.slice(1))
-    .join(" ");
 }
 
 function formatSeverity(severity: FindingSeverity) {
