@@ -31,5 +31,16 @@ services:
     ports:
       - "8080:8080"
 
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        VITE_MEDEN_API_BASE_URL: ""
+    container_name: meden-lens-frontend
+    depends_on:
+      - backend
+    ports:
+      - "${FRONTEND_PORT:-3000}:80"
+
 volumes:
   meden_lens_postgres_data:

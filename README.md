@@ -124,6 +124,14 @@ With Docker:
 docker compose up --build
 ```
 
+Frontend:
+
+```text
+http://localhost:3000
+```
+
+The containerized frontend proxies `/api` and `/actuator` requests to the backend service inside the Compose network.
+
 Backend:
 
 ```text
@@ -136,7 +144,7 @@ PostgreSQL:
 localhost:5432
 ```
 
-Run the frontend:
+For frontend development with hot reload instead of Docker:
 
 ```bash
 cd frontend
