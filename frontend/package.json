@@ -6,12 +6,13 @@
   "scripts": {
     "dev": "vite --host 0.0.0.0 --port 5173",
     "build": "tsc --noEmit && vite build",
-    "test": "node --experimental-strip-types --test src/api.test.mjs src/helpers.test.mjs",
+    "test": "node --experimental-strip-types --test src/api.test.mjs src/helpers.test.mjs src/run-route.test.mjs",
     "preview": "vite preview --host 0.0.0.0 --port 4173"
   },
   "dependencies": {
     "react": "^18.3.1",
-    "react-dom": "^18.3.1"
+    "react-dom": "^18.3.1",
+    "react-router-dom": "^7.18.2"
   },
   "devDependencies": {
     "@types/react": "^18.3.12",

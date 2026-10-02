@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useNavigate, useParams } from "react-router-dom";
 import {
   createSimulatorRun,
+  fetchRun,
   fetchRunAnalysis,
   fetchRunPage,
   fetchRunSummary,
@@ -14,6 +16,7 @@ import {
 } from "./comparison";
 import { apiHostLabel } from "./config";
 import { formatCount, formatDate, formatDuration, formatEnum, formatMoney } from "./formatters";
+import { runDetailPath, runIdFromRoute } from "./run-route";
 import type {
   AnalysisClassification,
   AnalysisResponse,
@@ -21,6 +24,7 @@ import type {
   FindingSeverity,
   RunListItemResponse,
   RunPageResponse,
+  RunResponse,
   RunSummaryResponse,
   SimulatorScenarioResponse,
   TaskProfileResponse
@@ -52,6 +56,11 @@ interface ComparisonMetric {
 }
 
 export default function App() {
+  const navigate = useNavigate();
+  const { runId: routeRunIdParameter } = useParams<{ runId: string }>();
+  const routeRunId = runIdFromRoute(routeRunIdParameter);
+  const isRunRoute = routeRunIdParameter !== undefined;
+  const hasInvalidRouteRunId = isRunRoute && routeRunId === null;
   const [summary, setSummary] = useState<RunSummaryResponse | null>(null);
   const [runs, setRuns] = useState<RunPageResponse | null>(null);
   const [scenarios, setScenarios] = useState<SimulatorScenarioResponse[]>([]);
@@ -60,19 +69,21 @@ export default function App() {
   const [taskTypeFilter, setTaskTypeFilter] = useState("ALL");
   const [teamFilter, setTeamFilter] = useState("");
   const [teamDraft, setTeamDraft] = useState("");
-  const [selectedRunId, setSelectedRunId] = useState<string | null>(null);
+  const [routedRun, setRoutedRun] = useState<RunListItemResponse | null>(null);
   const [analysisDetails, setAnalysisDetails] = useState<AnalysisResponse | null>(null);
   const [page, setPage] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
   const [isLoadingAnalysis, setIsLoadingAnalysis] = useState(false);
   const [isLoadingScenarios, setIsLoadingScenarios] = useState(true);
   const [isLoadingTaskProfiles, setIsLoadingTaskProfiles] = useState(true);
+  const [isLoadingRoutedRun, setIsLoadingRoutedRun] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isBackendOffline, setIsBackendOffline] = useState(false);
   const [analysisError, setAnalysisError] = useState<string | null>(null);
   const [scenarioLoadError, setScenarioLoadError] = useState<string | null>(null);
   const [simulationError, setSimulationError] = useState<string | null>(null);
   const [taskProfileError, setTaskProfileError] = useState<string | null>(null);
+  const [routedRunError, setRoutedRunError] = useState<string | null>(null);
   const [analysisRetryKey, setAnalysisRetryKey] = useState(0);
   const [runningScenarioKey, setRunningScenarioKey] = useState<string | null>(null);
   const [simulationNotice, setSimulationNotice] = useState<string | null>(null);
@@ -212,20 +223,27 @@ export default function App() {
           taskTypeOverride: "ALL",
           teamOverride: ""
         });
-        setSelectedRunId(simulatedRun.run.id);
+        navigate(runDetailPath(simulatedRun.run.id));
       } catch (simulationError) {
         setSimulationError(requestFailureMessage(simulationError));
       } finally {
         setRunningScenarioKey(null);
       }
     },
-    [loadDashboard]
+    [loadDashboard, navigate]
   );
 
   const items = useMemo(() => runs?.items ?? [], [runs]);
+  const listedRoutedRun = useMemo(
+    () => (routeRunId ? items.find((run) => run.id === routeRunId) ?? null : null),
+    [items, routeRunId]
+  );
   const selectedRun = useMemo(
-    () => items.find((run) => run.id === selectedRunId) ?? items[0] ?? null,
-    [items, selectedRunId]
+    () =>
+      isRunRoute
+        ? listedRoutedRun ?? (routedRun?.id === routeRunId ? routedRun : null)
+        : items[0] ?? null,
+    [isRunRoute, items, listedRoutedRun, routeRunId, routedRun]
   );
   const selectedTaskProfile = useMemo(
     () =>
@@ -242,19 +260,58 @@ export default function App() {
     statusFilter !== "ALL" || taskTypeFilter !== "ALL" || teamFilter.length > 0;
 
   useEffect(() => {
-    if (items.length === 0 && selectedRunId !== null) {
-      setSelectedRunId(null);
+    if (!routeRunId || listedRoutedRun) {
+      setRoutedRun(null);
+      setRoutedRunError(null);
+      setIsLoadingRoutedRun(false);
       return;
     }
 
-    if (items.length > 0 && !items.some((run) => run.id === selectedRunId)) {
-      setSelectedRunId(items[0].id);
-    }
-  }, [items, selectedRunId]);
+    const controller = new AbortController();
+
+    setRoutedRun(null);
+    setRoutedRunError(null);
+    setIsLoadingRoutedRun(true);
+
+    Promise.all([
+      fetchRun(routeRunId, controller.signal),
+      fetchRunAnalysis(routeRunId, controller.signal).catch((routeAnalysisError) => {
+        if (isNotFoundError(routeAnalysisError)) {
+          return null;
+        }
+
+        throw routeAnalysisError;
+      })
+    ])
+      .then(([run, analysis]) => {
+        setRoutedRun(toRunListItem(run, analysis));
+        setAnalysisDetails(analysis);
+      })
+      .catch((routeRunLoadError) => {
+        if (routeRunLoadError instanceof DOMException && routeRunLoadError.name === "AbortError") {
+          return;
+        }
+
+        setRoutedRunError(requestFailureMessage(routeRunLoadError));
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) {
+          setIsLoadingRoutedRun(false);
+        }
+      });
+
+    return () => controller.abort();
+  }, [listedRoutedRun, routeRunId]);
 
   useEffect(() => {
     if (!selectedRunIdForAnalysis || !selectedRunAnalyzed) {
       setAnalysisDetails(null);
+      setAnalysisError(null);
+      setIsLoadingAnalysis(false);
+      return;
+    }
+
+    if (analysisDetails?.runId === selectedRunIdForAnalysis) {
       setAnalysisError(null);
       setIsLoadingAnalysis(false);
       return;
@@ -282,7 +339,7 @@ export default function App() {
       });
 
     return () => controller.abort();
-  }, [analysisRetryKey, selectedRunAnalyzed, selectedRunIdForAnalysis]);
+  }, [analysisDetails?.runId, analysisRetryKey, selectedRunAnalyzed, selectedRunIdForAnalysis]);
 
   const handleStatusFilterChange = useCallback((nextStatus: ExecutionStatus | "ALL") => {
     setPage(0);
@@ -420,7 +477,11 @@ export default function App() {
 
           {!error && !isLoading && items.length > 0 ? (
             <>
-              <RunLedger items={items} selectedRunId={selectedRun?.id ?? null} onSelect={setSelectedRunId} />
+              <RunLedger
+                items={items}
+                selectedRunId={selectedRun?.id ?? null}
+                onSelect={(runId) => navigate(runDetailPath(runId))}
+              />
               <footer className="pagination-bar">
                 <span>
                   {formatCount(runs?.totalItems ?? 0)} runs / page {runs ? runs.page + 1 : 1} of{" "}
@@ -449,15 +510,31 @@ export default function App() {
           ) : null}
         </section>
 
-        <RunInspector
-          analysis={analysisDetails}
-          analysisError={analysisError}
-          isLoadingAnalysis={isLoadingAnalysis}
-          onRetryAnalysis={() => setAnalysisRetryKey((currentKey) => currentKey + 1)}
-          run={selectedRun}
-          summary={summary}
-          taskProfile={selectedTaskProfile}
-        />
+        {hasInvalidRouteRunId ? (
+          <RunRouteState
+            detail="The URL does not contain a valid execution run ID."
+            onBack={() => navigate("/")}
+            title="Invalid run link"
+          />
+        ) : routedRunError ? (
+          <RunRouteState
+            detail={`The requested run could not be loaded: ${routedRunError}`}
+            onBack={() => navigate("/")}
+            title="Run unavailable"
+          />
+        ) : isLoadingRoutedRun && !listedRoutedRun ? (
+          <RunRouteState detail="Fetching the requested execution run." title="Loading run" />
+        ) : (
+          <RunInspector
+            analysis={analysisDetails}
+            analysisError={analysisError}
+            isLoadingAnalysis={isLoadingAnalysis}
+            onRetryAnalysis={() => setAnalysisRetryKey((currentKey) => currentKey + 1)}
+            run={selectedRun}
+            summary={summary}
+            taskProfile={selectedTaskProfile}
+          />
+        )}
       </section>
     </main>
   );
@@ -854,6 +931,29 @@ function RunInspector({
   );
 }
 
+function RunRouteState({
+  detail,
+  onBack,
+  title
+}: {
+  detail: string;
+  onBack?: () => void;
+  title: string;
+}) {
+  return (
+    <aside className="inspector" aria-label="Run route status">
+      <p className="eyebrow">Selected Run</p>
+      <h2>{title}</h2>
+      <p className="analysis-empty">{detail}</p>
+      {onBack ? (
+        <button className="quiet-button" type="button" onClick={onBack}>
+          Back to ledger
+        </button>
+      ) : null}
+    </aside>
+  );
+}
+
 function MetricComparison({
   run,
   taskProfile
@@ -1077,6 +1177,33 @@ function requestFailureMessage(requestError: unknown) {
   }
 
   return requestError instanceof Error ? requestError.message : "Unexpected request failure";
+}
+
+function isNotFoundError(requestError: unknown) {
+  return requestError instanceof Error && requestError.message.startsWith("404 ");
+}
+
+function toRunListItem(
+  run: RunResponse,
+  analysis: AnalysisResponse | null
+): RunListItemResponse {
+  return {
+    id: run.id,
+    externalRunId: run.externalRunId,
+    agent: run.agent,
+    task: run.task,
+    execution: run.execution,
+    metadata: run.metadata,
+    createdAt: run.createdAt,
+    analysis: {
+      analyzed: analysis !== null,
+      balanceScore: analysis?.balanceScore ?? null,
+      classification: analysis?.classification ?? null,
+      estimatedCostReductionUsd: analysis
+        ? String(analysis.estimatedSavings.estimatedCostReductionUsd)
+        : null
+    }
+  };
 }
 
 function buildMetrics(summary: RunSummaryResponse | null): SummarySignal[] {

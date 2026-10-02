@@ -106,6 +106,35 @@ export interface RunListItemResponse {
   };
 }
 
+export interface RunResponse {
+  id: string;
+  externalRunId: string | null;
+  idempotencyKey: string;
+  previouslyProcessed: boolean;
+  agent: RunListItemResponse["agent"];
+  task: RunListItemResponse["task"];
+  execution: RunListItemResponse["execution"] & {
+    startedAt: string;
+    completedAt: string;
+  };
+  models: Array<{
+    provider: string;
+    model: string;
+    callCount: number;
+    inputTokens: number;
+    outputTokens: number;
+    estimatedCostUsd: string;
+  }>;
+  tools: Array<{
+    name: string;
+    callCount: number;
+    successCount: number;
+    failureCount: number;
+  }>;
+  metadata: RunListItemResponse["metadata"];
+  createdAt: string;
+}
+
 export interface TaskProfileResponse {
   id: string;
   taskType: string;

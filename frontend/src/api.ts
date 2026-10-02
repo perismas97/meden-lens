@@ -4,6 +4,7 @@ import type { RunPageParams } from "./run-page-query";
 import type {
   AnalysisResponse,
   RunPageResponse,
+  RunResponse,
   RunSummaryResponse,
   SimulatedRunResponse,
   SimulatorScenarioResponse,
@@ -18,6 +19,10 @@ export function fetchRunPage(params: RunPageParams, signal?: AbortSignal) {
   const query = buildRunPageQuery(params);
 
   return getJson<RunPageResponse>(`/api/v1/runs?${query.toString()}`, signal);
+}
+
+export function fetchRun(runId: string, signal?: AbortSignal) {
+  return getJson<RunResponse>(`/api/v1/runs/${encodeURIComponent(runId)}`, signal);
 }
 
 export function fetchRunAnalysis(runId: string, signal?: AbortSignal) {
