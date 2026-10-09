@@ -1,8 +1,8 @@
 # Meden Lens Local Agent
 
-This package will contain the local TypeScript agent used to produce real Meden
-Lens telemetry. The current increment contains only the model compatibility
-spike. It is not yet the document-summary agent.
+This package contains the local TypeScript agent used to produce real Meden Lens
+executions. It currently includes a document-summary workflow and the model
+compatibility spike used to select its first Ollama model.
 
 ## Prerequisites
 
@@ -45,3 +45,23 @@ npm run spike:model
 
 The command exits with a non-zero status when the server is unavailable, a model
 is missing, tool calling fails, or token metadata is absent.
+
+## Run the document-summary agent
+
+```powershell
+npm run agent:summary -- fixtures/documents/ai-support-operations.txt
+```
+
+The workflow accepts only `.txt` files inside `fixtures/documents`. The agent
+must call the controlled `read_document` tool before returning a summary that
+matches the configured Zod schema.
+
+The default model is `llama3.2:3b`. Override it without changing source code:
+
+```powershell
+$env:MEDEN_AGENT_MODEL = "qwen3:4b"
+npm run agent:summary -- fixtures/documents/ai-support-operations.txt
+```
+
+This increment prints the structured result locally. It does not send telemetry
+to the Meden Lens backend yet.

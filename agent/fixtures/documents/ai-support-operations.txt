@@ -1,0 +1,61 @@
+AI Support Operations Pilot - Internal Review
+
+Overview
+
+Northstar Support ran a six-week pilot to evaluate whether a local AI assistant
+could reduce repetitive work for the technical support team. The pilot involved
+18 support specialists across the billing and account-access queues. The system
+was intentionally advisory: specialists reviewed every suggested response before
+sending it to a customer.
+
+Pilot scope
+
+The assistant handled three workflows. It classified incoming requests, drafted
+first responses, and retrieved relevant paragraphs from the internal support
+handbook. It could not send messages, issue refunds, change customer accounts, or
+close tickets. Those actions remained under human control.
+
+During the pilot, the team processed 1,240 tickets with assistance enabled. The
+assistant completed its requested workflow for 91 percent of those tickets. The
+median assisted handling time was 6 minutes, compared with a 9-minute baseline
+measured during the four weeks before the pilot. The median AI execution itself
+took 38 seconds. Specialists accepted a draft without substantial editing in 62
+percent of successful runs.
+
+Operational findings
+
+Account-access requests produced the strongest results because the resolution
+steps were well documented. Billing disputes were less reliable when a ticket
+referred to an unusual contract or an older pricing plan. In those cases,
+specialists frequently ignored the draft and searched the handbook manually.
+
+The assistant used an average of 4,800 tokens per completed ticket. Five percent
+of runs exceeded 12,000 tokens, usually after repeated handbook searches. The
+pilot configuration allowed three retries, but most successful runs used none.
+The operations team observed 27 runs that reached the retry limit. Nineteen of
+those runs were associated with incomplete or contradictory ticket descriptions.
+
+Safety and privacy
+
+Customer names and email addresses were removed before requests reached the
+model. Ticket text and model output were retained for seven days in the pilot
+environment for debugging. Access was limited to the support platform team.
+The security review found no evidence that the model could perform account
+changes, but it recommended testing prompt-injection attempts before a broader
+rollout.
+
+Open questions and risks
+
+The pilot did not measure customer satisfaction, long-term resolution rate, or
+the number of tickets reopened after an assisted response. It also did not test
+languages other than English. The baseline handling-time comparison may be
+affected by seasonal changes in ticket volume. No decision has been made about
+whether seven-day retention is appropriate for production.
+
+Proposed next step
+
+The support platform team recommends a second pilot limited to account-access
+requests. The next phase should add prompt-injection tests, track reopened
+tickets, measure customer satisfaction, and set a lower retry limit for repeated
+handbook searches. Billing workflows should remain advisory until contract and
+legacy-pricing documentation is improved.
