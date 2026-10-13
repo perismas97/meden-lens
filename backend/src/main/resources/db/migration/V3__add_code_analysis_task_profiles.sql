@@ -1,0 +1,39 @@
+INSERT INTO task_profiles (
+    task_type,
+    complexity,
+    max_model_calls,
+    max_tool_calls,
+    recommended_input_tokens,
+    recommended_output_tokens,
+    recommended_total_tokens,
+    recommended_duration_ms,
+    recommended_cost_usd,
+    max_retries,
+    allow_sub_agents
+) VALUES
+(
+    'CODE_REVIEW',
+    'MEDIUM',
+    4,
+    4,
+    20000,
+    4000,
+    24000,
+    60000,
+    0.4000,
+    1,
+    false
+),
+(
+    'DEBUGGING',
+    'HIGH',
+    6,
+    10,
+    30000,
+    10000,
+    40000,
+    120000,
+    0.9000,
+    2,
+    false
+);

@@ -48,11 +48,38 @@ class RunApiIntegrationTest {
     ObjectMapper objectMapper;
 
     @Test
-    void listsSeededTaskProfiles() {
+    void listsSeededTaskProfiles() throws Exception {
         ResponseEntity<String> response = restTemplate.getForEntity(url("/api/v1/task-profiles"), String.class);
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+        JsonNode profiles = objectMapper.readTree(response.getBody());
+
+        assertThat(profiles).hasSize(5);
         assertThat(response.getBody()).contains("SIMPLE_TRANSFORMATION", "DOCUMENT_SUMMARY", "DEEP_RESEARCH");
+
+        JsonNode codeReview = taskProfile(profiles, "CODE_REVIEW");
+        assertThat(codeReview.path("complexity").asText()).isEqualTo("MEDIUM");
+        assertThat(codeReview.path("maxModelCalls").asInt()).isEqualTo(4);
+        assertThat(codeReview.path("maxToolCalls").asInt()).isEqualTo(4);
+        assertThat(codeReview.path("recommendedInputTokens").asLong()).isEqualTo(20_000);
+        assertThat(codeReview.path("recommendedOutputTokens").asLong()).isEqualTo(4_000);
+        assertThat(codeReview.path("recommendedTotalTokens").asLong()).isEqualTo(24_000);
+        assertThat(codeReview.path("recommendedDurationMs").asLong()).isEqualTo(60_000);
+        assertThat(codeReview.path("recommendedCostUsd").decimalValue()).isEqualByComparingTo("0.4000");
+        assertThat(codeReview.path("maxRetries").asInt()).isEqualTo(1);
+        assertThat(codeReview.path("allowSubAgents").asBoolean()).isFalse();
+
+        JsonNode debugging = taskProfile(profiles, "DEBUGGING");
+        assertThat(debugging.path("complexity").asText()).isEqualTo("HIGH");
+        assertThat(debugging.path("maxModelCalls").asInt()).isEqualTo(6);
+        assertThat(debugging.path("maxToolCalls").asInt()).isEqualTo(10);
+        assertThat(debugging.path("recommendedInputTokens").asLong()).isEqualTo(30_000);
+        assertThat(debugging.path("recommendedOutputTokens").asLong()).isEqualTo(10_000);
+        assertThat(debugging.path("recommendedTotalTokens").asLong()).isEqualTo(40_000);
+        assertThat(debugging.path("recommendedDurationMs").asLong()).isEqualTo(120_000);
+        assertThat(debugging.path("recommendedCostUsd").decimalValue()).isEqualByComparingTo("0.9000");
+        assertThat(debugging.path("maxRetries").asInt()).isEqualTo(2);
+        assertThat(debugging.path("allowSubAgents").asBoolean()).isFalse();
     }
 
     @Test
@@ -66,6 +93,16 @@ class RunApiIntegrationTest {
         assertThat(created.getBody()).contains("\"previouslyProcessed\":false");
         assertThat(duplicate.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(duplicate.getBody()).contains("\"previouslyProcessed\":true");
+    }
+
+    private JsonNode taskProfile(JsonNode profiles, String taskType) {
+        for (JsonNode profile : profiles) {
+            if (taskType.equals(profile.path("taskType").asText())) {
+                return profile;
+            }
+        }
+
+        throw new AssertionError("Task profile not found: " + taskType);
     }
 
     @Test
