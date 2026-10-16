@@ -1,8 +1,9 @@
 # Meden Lens Local Agent
 
 This package contains the local TypeScript agent used to produce real Meden Lens
-executions. It currently includes a document-summary workflow and the model
-compatibility spike used to select its first Ollama model.
+executions. It includes controlled document-summary, code-review, and debugging
+workflows plus the model compatibility spike used to select its first Ollama
+model.
 
 ## Prerequisites
 
@@ -65,3 +66,30 @@ npm run agent:summary -- fixtures/documents/ai-support-operations.txt
 
 This increment prints the structured result locally. It does not send telemetry
 to the Meden Lens backend yet.
+
+## Run the code-review agent
+
+```powershell
+npm run agent:review -- fixtures/code-review/user-profile-service.ts
+```
+
+The workflow reads one source fixture through a controlled tool and returns a
+structured review. `NOT_EVALUATED` means that the response matches the review
+schema; it does not claim that every finding is correct or complete.
+
+## Run the debugging agent
+
+```powershell
+npm run agent:debug -- retry-delay
+```
+
+The workflow copies the fixture to a temporary directory, confirms that its
+tests fail, asks the model for a complete replacement source file, and runs the
+unchanged tests again. If the first replacement fails, the agent receives the
+verification output and gets one bounded retry. `VERIFIED` means the final
+replacement passed those tests. The original fixture is never modified.
+
+Document summary and code review default to `llama3.2:3b`. Debugging defaults to
+`qwen3:4b` because the controlled retry-delay fixture showed a task-specific
+quality advantage. `MEDEN_AGENT_MODEL` overrides either default when comparing
+models.

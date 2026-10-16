@@ -7,10 +7,12 @@
     "node": ">=22.18"
   },
   "scripts": {
+    "agent:debug": "node --experimental-strip-types src/run-debugging.ts",
+    "agent:review": "node --experimental-strip-types src/run-code-review.ts",
     "agent:summary": "node --experimental-strip-types src/run-document-summary.ts",
     "spike:model": "node --experimental-strip-types src/model-compatibility-spike.ts",
     "check": "tsc --noEmit",
-    "test": "node --experimental-strip-types --test src/model-compatibility-spike.test.ts src/document-summary/document-summary.test.ts"
+    "test": "node --experimental-strip-types --test src/model-compatibility-spike.test.ts src/document-summary/document-summary.test.ts src/code-review/code-review.test.ts src/debugging/debugging.test.ts"
   },
   "devDependencies": {
     "@types/node": "^24.0.0",

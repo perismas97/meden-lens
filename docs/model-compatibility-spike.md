@@ -88,6 +88,24 @@ shows a quality advantage that justifies its higher observed resource use.
 This decision is local and version-specific. A model, Ollama, prompt, or hardware
 change requires rerunning the spike before changing the default.
 
+## Workflow-Specific Follow-up
+
+On 2026-10-16, both models were exercised against the controlled `retry-delay`
+debugging fixture. The workflow first proves that the fixture tests fail, asks
+the model for a replacement source file, and then runs the unchanged tests in
+an isolated temporary directory.
+
+- `llama3.2:3b` produced two behaviorally incorrect replacements. Both were
+  rejected by the verifier.
+- `qwen3:4b` identified the off-by-one error on its first attempt and its
+  replacement passed all three fixture tests.
+
+The result does not establish general model superiority. It does establish a
+task-specific reason to use `qwen3:4b` as the default debugging model while
+retaining `llama3.2:3b` for the faster document-summary and code-review
+workflows. The verifier, not the model's explanation, remains the source of the
+debugging outcome.
+
 ## Sources
 
 - [Ollama chat API](https://docs.ollama.com/api/chat)
