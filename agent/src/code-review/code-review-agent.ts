@@ -1,9 +1,14 @@
 import path from "node:path";
 
-import { ChatOllama } from "@langchain/ollama";
 import { HumanMessage, SystemMessage, ToolMessage, tool } from "langchain";
 import { z } from "zod";
 
+import {
+  OllamaAgentModel,
+  type AgentModel,
+} from "../model/agent-model.ts";
+import type { NormalizedAgentTelemetry } from "../telemetry/normalized-agent-telemetry.ts";
+import { TelemetryObserver } from "../telemetry/telemetry-observer.ts";
 import { codeReviewSchema, type CodeReview } from "./code-review-schema.ts";
 import { readCodeReviewFixture, resolveCodeReviewFixture } from "./source-reader.ts";
 
@@ -15,6 +20,7 @@ export interface CodeReviewRun {
   executionStatus: "COMPLETED";
   outcomeStatus: "NOT_EVALUATED";
   review: CodeReview;
+  telemetry: NormalizedAgentTelemetry;
 }
 
 interface RunCodeReviewOptions {
@@ -22,11 +28,17 @@ interface RunCodeReviewOptions {
   fixtureRoot: string;
   model: string;
   ollamaBaseUrl: string;
+  agentModel?: AgentModel;
 }
 
 export async function runCodeReview(
   options: RunCodeReviewOptions,
 ): Promise<CodeReviewRun> {
+  const observer = new TelemetryObserver({
+    workflow: "code-review",
+    taskCategory: "CODE_REVIEW",
+    modelName: options.model,
+  });
   const absolutePath = resolveCodeReviewFixture(options.fixtureRoot, options.requestedPath);
   const sourceFile = path.basename(absolutePath);
   let sourceReads = 0;
@@ -48,13 +60,12 @@ export async function runCodeReview(
     schema: readSourceInputSchema,
   });
 
-  const model = new ChatOllama({
-    model: options.model,
-    baseUrl: options.ollamaBaseUrl,
-    temperature: 0,
-    maxRetries: 0,
-    think: false,
-  });
+  const model =
+    options.agentModel ??
+    new OllamaAgentModel({
+      model: options.model,
+      baseUrl: options.ollamaBaseUrl,
+    });
   const systemMessage = new SystemMessage(
     [
       "You are a focused code-review agent.",
@@ -67,8 +78,10 @@ export async function runCodeReview(
   );
   const userMessage = new HumanMessage(`Review the fixture named ${sourceFile}.`);
 
-  const toolEnabledModel = model.bindTools([readSourceFile]);
-  const toolSelection = await toolEnabledModel.invoke([systemMessage, userMessage]);
+  const toolSelection = await observer.observeModelCall(
+    () => model.invokeWithTools([systemMessage, userMessage], [readSourceFile]),
+    (response) => response.usage_metadata,
+  );
   const toolCalls = toolSelection.tool_calls ?? [];
   const selectedTool = toolCalls[0];
 
@@ -77,20 +90,23 @@ export async function runCodeReview(
   }
 
   const toolInput = readSourceInputSchema.parse(selectedTool.args);
-  const source = await readOnce(toolInput.fileName);
+  const source = await observer.observeToolCall(() =>
+    readOnce(toolInput.fileName),
+  );
   const toolResult = new ToolMessage({
     content: source,
     name: "read_source_file",
     tool_call_id: selectedTool.id ?? "read_source_file-call",
   });
 
-  const structuredModel = model.withStructuredOutput(codeReviewSchema);
-  const structuredResponse = await structuredModel.invoke([
-    systemMessage,
-    userMessage,
-    toolSelection,
-    toolResult,
-  ]);
+  const structuredResponse = await observer.observeModelCall(
+    () =>
+      model.invokeStructured(
+        [systemMessage, userMessage, toolSelection, toolResult],
+        codeReviewSchema,
+      ),
+    (response) => response.raw.usage_metadata,
+  );
 
   if (sourceReads !== 1) {
     throw new Error(`Expected one source read, observed ${sourceReads}.`);
@@ -103,6 +119,10 @@ export async function runCodeReview(
     sourceFile,
     executionStatus: "COMPLETED",
     outcomeStatus: "NOT_EVALUATED",
-    review: codeReviewSchema.parse(structuredResponse),
+    review: codeReviewSchema.parse(structuredResponse.parsed),
+    telemetry: observer.complete({
+      executionStatus: "COMPLETED",
+      outcomeStatus: "NOT_EVALUATED",
+    }),
   };
 }

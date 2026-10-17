@@ -1,7 +1,12 @@
-import { ChatOllama } from "@langchain/ollama";
 import { HumanMessage, SystemMessage, ToolMessage, tool } from "langchain";
 import { z } from "zod";
 
+import {
+  OllamaAgentModel,
+  type AgentModel,
+} from "../model/agent-model.ts";
+import type { NormalizedAgentTelemetry } from "../telemetry/normalized-agent-telemetry.ts";
+import { TelemetryObserver } from "../telemetry/telemetry-observer.ts";
 import {
   prepareDebugFixture,
   removeDebugWorkspace,
@@ -25,6 +30,7 @@ export interface DebuggingRun {
   attempt: DebuggingAttempt;
   initialVerification: VerificationResult;
   finalVerification: VerificationResult;
+  telemetry: NormalizedAgentTelemetry;
 }
 
 interface RunDebuggingOptions {
@@ -32,11 +38,17 @@ interface RunDebuggingOptions {
   fixtureRoot: string;
   model: string;
   ollamaBaseUrl: string;
+  agentModel?: AgentModel;
 }
 
 export async function runDebugging(
   options: RunDebuggingOptions,
 ): Promise<DebuggingRun> {
+  const observer = new TelemetryObserver({
+    workflow: "debugging",
+    taskCategory: "DEBUGGING",
+    modelName: options.model,
+  });
   const fixture = await prepareDebugFixture(options.fixtureRoot, options.fixtureKey);
 
   try {
@@ -69,29 +81,30 @@ export async function runDebugging(
       },
     );
 
-    const model = new ChatOllama({
-      model: options.model,
-      baseUrl: options.ollamaBaseUrl,
-      temperature: 0,
-      maxRetries: 0,
-      think: false,
-    });
+    const model =
+      options.agentModel ??
+      new OllamaAgentModel({
+        model: options.model,
+        baseUrl: options.ollamaBaseUrl,
+      });
     const systemMessage = new SystemMessage(
       [
         "You are a debugging agent working on one controlled JavaScript fixture.",
         "Call inspect_debug_fixture exactly once before proposing a fix.",
         "Use the source, tests, and failing output as the only evidence.",
         "Make the smallest correction that satisfies the existing tests.",
-      "Compare every expected and actual value before choosing the correction.",
-      "A syntax-only rewrite that preserves the same output is not a fix.",
+        "Compare every expected and actual value before choosing the correction.",
+        "A syntax-only rewrite that preserves the same output is not a fix.",
         "Return the complete source.mjs content in replacementSource without Markdown fences.",
         "Do not modify, weaken, remove, or bypass the tests.",
       ].join(" "),
     );
     const userMessage = new HumanMessage(`Diagnose and fix debugging fixture ${fixture.key}.`);
 
-    const toolEnabledModel = model.bindTools([inspectFixture]);
-    const toolSelection = await toolEnabledModel.invoke([systemMessage, userMessage]);
+    const toolSelection = await observer.observeModelCall(
+      () => model.invokeWithTools([systemMessage, userMessage], [inspectFixture]),
+      (response) => response.usage_metadata,
+    );
     const toolCalls = toolSelection.tool_calls ?? [];
     const selectedTool = toolCalls[0];
 
@@ -100,22 +113,25 @@ export async function runDebugging(
     }
 
     const toolInput = inspectInputSchema.parse(selectedTool.args);
-    const inspection = await inspectFixture.invoke(toolInput);
+    const inspection = await observer.observeToolCall(() =>
+      inspectFixture.invoke(toolInput),
+    );
     const toolResult = new ToolMessage({
       content: String(inspection),
       name: "inspect_debug_fixture",
       tool_call_id: selectedTool.id ?? "inspect_debug_fixture-call",
     });
-    const structuredModel = model.withStructuredOutput(debuggingAttemptSchema);
     const conversation = [
       systemMessage,
       userMessage,
       toolSelection,
       toolResult,
     ];
-    let attempt = debuggingAttemptSchema.parse(
-      await structuredModel.invoke(conversation),
+    let structuredResponse = await observer.observeModelCall(
+      () => model.invokeStructured(conversation, debuggingAttemptSchema),
+      (response) => response.raw.usage_metadata,
     );
+    let attempt = debuggingAttemptSchema.parse(structuredResponse.parsed);
 
     if (inspections !== 1) {
       throw new Error(`Expected one fixture inspection, observed ${inspections}.`);
@@ -127,6 +143,7 @@ export async function runDebugging(
 
     if (!finalVerification.passed) {
       retryCount = 1;
+      observer.recordRetry();
       const retryMessage = new HumanMessage(
         [
           "The proposed replacement failed the unchanged tests.",
@@ -136,12 +153,20 @@ export async function runDebugging(
           `Verification output:\n${finalVerification.output}`,
         ].join("\n\n"),
       );
-      attempt = debuggingAttemptSchema.parse(
-        await structuredModel.invoke([...conversation, retryMessage]),
+      structuredResponse = await observer.observeModelCall(
+        () =>
+          model.invokeStructured(
+            [...conversation, retryMessage],
+            debuggingAttemptSchema,
+          ),
+        (response) => response.raw.usage_metadata,
       );
+      attempt = debuggingAttemptSchema.parse(structuredResponse.parsed);
       await writeDebugReplacement(fixture.workspace, attempt.replacementSource);
       finalVerification = await runDebugVerification(fixture.workspace);
     }
+
+    const outcomeStatus = finalVerification.passed ? "VERIFIED" : "REJECTED";
 
     return {
       workflow: "debugging",
@@ -149,11 +174,15 @@ export async function runDebugging(
       model: options.model,
       fixture: fixture.key,
       executionStatus: "COMPLETED",
-      outcomeStatus: finalVerification.passed ? "VERIFIED" : "REJECTED",
+      outcomeStatus,
       retryCount,
       attempt,
       initialVerification,
       finalVerification,
+      telemetry: observer.complete({
+        executionStatus: "COMPLETED",
+        outcomeStatus,
+      }),
     };
   } finally {
     await removeDebugWorkspace(fixture.workspace);

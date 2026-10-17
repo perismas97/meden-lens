@@ -93,3 +93,19 @@ Document summary and code review default to `llama3.2:3b`. Debugging defaults to
 `qwen3:4b` because the controlled retry-delay fixture showed a task-specific
 quality advantage. `MEDEN_AGENT_MODEL` overrides either default when comparing
 models.
+
+## Normalized telemetry
+
+Every workflow result now includes a `telemetry` object. The observer records
+provider-reported input and output tokens, attempted model and tool calls, tool
+successes and failures, bounded retries, monotonic duration, execution and
+outcome status, and a 32-character trace ID.
+
+Telemetry is aggregate-only. It does not contain prompts, document contents,
+source code, tool arguments, tool output, or model responses. Local Ollama runs
+report `actualCostUsd` as `0`. If any model call omits token metadata, token
+totals are `null` and `TOKEN_USAGE_MISSING` is added to
+`completenessWarnings`; the observer never estimates missing tokens.
+
+This increment prints telemetry with the local workflow result. Automatic
+ingestion into the Meden Lens backend is a later increment.
