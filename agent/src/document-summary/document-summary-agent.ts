@@ -1,9 +1,14 @@
 import path from "node:path";
 
-import { ChatOllama } from "@langchain/ollama";
 import { HumanMessage, SystemMessage, ToolMessage, tool } from "langchain";
 import { z } from "zod";
 
+import {
+  OllamaAgentModel,
+  type AgentModel,
+} from "../model/agent-model.ts";
+import type { NormalizedAgentTelemetry } from "../telemetry/normalized-agent-telemetry.ts";
+import { TelemetryObserver } from "../telemetry/telemetry-observer.ts";
 import { readFixtureDocument, resolveFixtureDocument } from "./document-reader.ts";
 import {
   documentSummarySchema,
@@ -18,6 +23,7 @@ export interface DocumentSummaryRun {
   executionStatus: "COMPLETED";
   outcomeStatus: "NOT_EVALUATED";
   summary: DocumentSummary;
+  telemetry: NormalizedAgentTelemetry;
 }
 
 interface RunDocumentSummaryOptions {
@@ -25,11 +31,17 @@ interface RunDocumentSummaryOptions {
   fixtureRoot: string;
   model: string;
   ollamaBaseUrl: string;
+  agentModel?: AgentModel;
 }
 
 export async function runDocumentSummary(
   options: RunDocumentSummaryOptions,
 ): Promise<DocumentSummaryRun> {
+  const observer = new TelemetryObserver({
+    workflow: "document-summary",
+    taskCategory: "DOCUMENT_SUMMARY",
+    modelName: options.model,
+  });
   const absolutePath = resolveFixtureDocument(options.fixtureRoot, options.requestedPath);
   const sourceFile = path.basename(absolutePath);
   let documentReads = 0;
@@ -57,13 +69,12 @@ export async function runDocumentSummary(
     },
   );
 
-  const model = new ChatOllama({
-    model: options.model,
-    baseUrl: options.ollamaBaseUrl,
-    temperature: 0,
-    maxRetries: 0,
-    think: false,
-  });
+  const model =
+    options.agentModel ??
+    new OllamaAgentModel({
+      model: options.model,
+      baseUrl: options.ollamaBaseUrl,
+    });
 
   const systemMessage = new SystemMessage(
     [
@@ -79,8 +90,10 @@ export async function runDocumentSummary(
     `Read and summarize the fixture named ${sourceFile}.`,
   );
 
-  const toolEnabledModel = model.bindTools([readDocument]);
-  const toolSelection = await toolEnabledModel.invoke([systemMessage, userMessage]);
+  const toolSelection = await observer.observeModelCall(
+    () => model.invokeWithTools([systemMessage, userMessage], [readDocument]),
+    (response) => response.usage_metadata,
+  );
   const toolCalls = toolSelection.tool_calls ?? [];
   const selectedTool = toolCalls[0];
 
@@ -89,26 +102,29 @@ export async function runDocumentSummary(
   }
 
   const toolInput = readDocumentInputSchema.parse(selectedTool.args);
-  const documentContent = await readOnce(toolInput.fileName);
+  const documentContent = await observer.observeToolCall(() =>
+    readOnce(toolInput.fileName),
+  );
   const toolResult = new ToolMessage({
     content: String(documentContent),
     name: "read_document",
     tool_call_id: selectedTool.id ?? "read_document-call",
   });
 
-  const structuredModel = model.withStructuredOutput(documentSummarySchema);
-  const structuredResponse = await structuredModel.invoke([
-    systemMessage,
-    userMessage,
-    toolSelection,
-    toolResult,
-  ]);
+  const structuredResponse = await observer.observeModelCall(
+    () =>
+      model.invokeStructured(
+        [systemMessage, userMessage, toolSelection, toolResult],
+        documentSummarySchema,
+      ),
+    (response) => response.raw.usage_metadata,
+  );
 
   if (documentReads !== 1) {
     throw new Error(`Expected one document read, observed ${documentReads}.`);
   }
 
-  const summary = documentSummarySchema.parse(structuredResponse);
+  const summary = documentSummarySchema.parse(structuredResponse.parsed);
 
   return {
     workflow: "document-summary",
@@ -118,5 +134,9 @@ export async function runDocumentSummary(
     executionStatus: "COMPLETED",
     outcomeStatus: "NOT_EVALUATED",
     summary,
+    telemetry: observer.complete({
+      executionStatus: "COMPLETED",
+      outcomeStatus: "NOT_EVALUATED",
+    }),
   };
 }

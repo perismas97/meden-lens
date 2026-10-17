@@ -4,7 +4,9 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import test from "node:test";
 
+import { MockAgentModel } from "../test-support/mock-agent-model.ts";
 import { readFixtureDocument, resolveFixtureDocument } from "./document-reader.ts";
+import { runDocumentSummary } from "./document-summary-agent.ts";
 import { documentSummarySchema } from "./summary-schema.ts";
 
 test("accepts a complete structured document summary", () => {
@@ -50,4 +52,41 @@ test("rejects paths outside the configured fixture directory", async () => {
 
   assert.throws(() => resolveFixtureDocument(root, outsidePath), /must be inside/);
   await assert.rejects(() => readFixtureDocument(root, "../outside.txt"), /without directory segments/);
+});
+
+test("returns normalized telemetry with a mocked model", async () => {
+  const root = await mkdtemp(path.join(tmpdir(), "meden-summary-telemetry-"));
+  const sourceText = "Synthetic support report that must not appear in telemetry.";
+  await writeFile(path.join(root, "sample.txt"), sourceText, "utf8");
+  const model = new MockAgentModel({
+    toolCall: {
+      name: "read_document",
+      args: { fileName: "sample.txt" },
+      id: "summary-tool-call",
+    },
+    structuredResponses: [
+      {
+        title: "Synthetic support report",
+        executiveSummary:
+          "The controlled report records an operational observation without evaluating output quality.",
+        keyPoints: ["The input is synthetic.", "The workflow uses one tool.", "Usage is provider reported."],
+        risksOrUnknowns: ["Output quality is not evaluated."],
+      },
+    ],
+  });
+
+  const result = await runDocumentSummary({
+    requestedPath: path.join(root, "sample.txt"),
+    fixtureRoot: root,
+    model: "mock-model",
+    ollamaBaseUrl: "http://unused",
+    agentModel: model,
+  });
+
+  assert.equal(result.telemetry.modelCalls, 2);
+  assert.equal(result.telemetry.toolCalls, 1);
+  assert.equal(result.telemetry.inputTokens, 30);
+  assert.equal(result.telemetry.outputTokens, 10);
+  assert.match(result.telemetry.traceId, /^[a-f0-9]{32}$/);
+  assert.doesNotMatch(JSON.stringify(result.telemetry), /Synthetic support report that must not appear/);
 });
