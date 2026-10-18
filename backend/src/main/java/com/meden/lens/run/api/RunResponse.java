@@ -1,6 +1,9 @@
 package com.meden.lens.run.api;
 
 import com.meden.lens.run.domain.ExecutionStatus;
+import com.meden.lens.run.domain.InputSizeUnit;
+import com.meden.lens.run.domain.OutcomeStatus;
+import com.meden.lens.run.domain.RunSource;
 import com.meden.lens.taskprofile.domain.Complexity;
 import com.meden.lens.taskprofile.domain.TaskType;
 
@@ -14,8 +17,11 @@ public record RunResponse(
     String externalRunId,
     String idempotencyKey,
     boolean previouslyProcessed,
+    RunSource source,
     AgentResponse agent,
+    WorkflowResponse workflow,
     TaskResponse task,
+    InputResponse input,
     ExecutionResponse execution,
     List<ModelUsageResponse> models,
     List<ToolUsageResponse> tools,
@@ -26,11 +32,19 @@ public record RunResponse(
     public record AgentResponse(String name, String version) {
     }
 
+    public record WorkflowResponse(String key, String version, String promptVersion) {
+    }
+
     public record TaskResponse(TaskType type, String description, Complexity complexity) {
+    }
+
+    public record InputResponse(long sizeValue, InputSizeUnit sizeUnit, String fingerprint) {
     }
 
     public record ExecutionResponse(
         ExecutionStatus status,
+        String traceId,
+        OutcomeStatus outcomeStatus,
         Instant startedAt,
         Instant completedAt,
         long durationMs,
@@ -48,6 +62,7 @@ public record RunResponse(
     public record ModelUsageResponse(
         String provider,
         String model,
+        String modelVersion,
         int callCount,
         long inputTokens,
         long outputTokens,

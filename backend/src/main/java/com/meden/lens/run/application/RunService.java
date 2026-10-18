@@ -8,6 +8,7 @@ import com.meden.lens.run.api.RunPageResponse;
 import com.meden.lens.run.api.RunResponse;
 import com.meden.lens.run.domain.ExecutionRunEntity;
 import com.meden.lens.run.domain.ExecutionStatus;
+import com.meden.lens.run.domain.RunSource;
 import com.meden.lens.run.infrastructure.ExecutionRunRepository;
 import com.meden.lens.shared.errors.ApiValidationException;
 import com.meden.lens.shared.errors.FieldErrorDetail;
@@ -64,11 +65,24 @@ public class RunService {
 
     @Transactional
     public RunResponse createRun(CreateRunRequest request, String headerIdempotencyKey) {
+        return createRun(request, headerIdempotencyKey, RunSource.API);
+    }
+
+    @Transactional
+    public RunResponse createDemoRun(CreateRunRequest request) {
+        return createRun(request, null, RunSource.DEMO);
+    }
+
+    private RunResponse createRun(
+        CreateRunRequest request,
+        String headerIdempotencyKey,
+        RunSource source
+    ) {
         String idempotencyKey = idempotencyKeyResolver.resolve(request, headerIdempotencyKey);
 
         return runRepository.findByIdempotencyKey(idempotencyKey)
             .map(existingRun -> mapper.toResponse(existingRun, true))
-            .orElseGet(() -> createNewRun(request, idempotencyKey));
+            .orElseGet(() -> createNewRun(request, idempotencyKey, source));
     }
 
     @Transactional(readOnly = true)
@@ -196,11 +210,15 @@ public class RunService {
         };
     }
 
-    private RunResponse createNewRun(CreateRunRequest request, String idempotencyKey) {
+    private RunResponse createNewRun(
+        CreateRunRequest request,
+        String idempotencyKey,
+        RunSource source
+    ) {
         ensureTaskProfileExists(request);
         validator.validate(request);
 
-        ExecutionRunEntity run = mapper.toEntity(request, idempotencyKey);
+        ExecutionRunEntity run = mapper.toEntity(request, idempotencyKey, source);
 
         try {
             ExecutionRunEntity savedRun = runRepository.saveAndFlush(run);

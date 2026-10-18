@@ -83,16 +83,75 @@ class RunApiIntegrationTest {
     }
 
     @Test
-    void createsRunAndReturnsExistingRunForDuplicateIdempotencyKey() {
+    void createsLegacyRunWithBackwardCompatibleMetadataDefaults() throws Exception {
         HttpEntity<String> entity = jsonEntity(validRunJson("document-summary-it-001"));
 
         ResponseEntity<String> created = restTemplate.exchange(url("/api/v1/runs"), HttpMethod.POST, entity, String.class);
         ResponseEntity<String> duplicate = restTemplate.exchange(url("/api/v1/runs"), HttpMethod.POST, entity, String.class);
 
         assertThat(created.getStatusCode()).isEqualTo(HttpStatus.CREATED);
-        assertThat(created.getBody()).contains("\"previouslyProcessed\":false");
+        JsonNode createdBody = objectMapper.readTree(created.getBody());
+        assertThat(createdBody.path("previouslyProcessed").asBoolean()).isFalse();
+        assertThat(createdBody.path("source").asText()).isEqualTo("API");
+        assertThat(createdBody.path("workflow").isNull()).isTrue();
+        assertThat(createdBody.path("input").isNull()).isTrue();
+        assertThat(createdBody.path("execution").path("traceId").isNull()).isTrue();
+        assertThat(createdBody.path("execution").path("outcomeStatus").asText())
+            .isEqualTo("NOT_EVALUATED");
+        assertThat(createdBody.path("models").get(0).path("modelVersion").isNull()).isTrue();
         assertThat(duplicate.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(duplicate.getBody()).contains("\"previouslyProcessed\":true");
+    }
+
+    @Test
+    void persistsAndReturnsExtendedExecutionRunMetadata() throws Exception {
+        ResponseEntity<String> created = restTemplate.exchange(
+            url("/api/v1/runs"),
+            HttpMethod.POST,
+            jsonEntity(instrumentedRunJson("instrumented-summary-it-001")),
+            String.class
+        );
+
+        assertThat(created.getStatusCode()).isEqualTo(HttpStatus.CREATED);
+        JsonNode createdBody = objectMapper.readTree(created.getBody());
+        String runId = createdBody.path("id").asText();
+
+        assertExtendedMetadata(createdBody);
+
+        ResponseEntity<String> fetched = restTemplate.getForEntity(
+            url("/api/v1/runs/" + runId),
+            String.class
+        );
+
+        assertThat(fetched.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertExtendedMetadata(objectMapper.readTree(fetched.getBody()));
+
+        ResponseEntity<String> listed = restTemplate.getForEntity(
+            url("/api/v1/runs?team=portfolio"),
+            String.class
+        );
+        JsonNode listedRun = objectMapper.readTree(listed.getBody()).path("items").get(0);
+
+        assertThat(listed.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(listedRun.path("input").path("sizeValue").asLong()).isEqualTo(1_684L);
+        assertThat(listedRun.path("input").path("sizeUnit").asText()).isEqualTo("CHARACTERS");
+        assertThat(listedRun.path("input").has("fingerprint")).isFalse();
+    }
+
+    @Test
+    void rejectsMalformedAgentTraceId() {
+        String malformed = instrumentedRunJson("instrumented-summary-invalid-trace-it-001")
+            .replace("3011b85749acd48e3fe1e2294493b18d", "not-a-trace-id");
+
+        ResponseEntity<String> response = restTemplate.exchange(
+            url("/api/v1/runs"),
+            HttpMethod.POST,
+            jsonEntity(malformed),
+            String.class
+        );
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+        assertThat(response.getBody()).contains("VALIDATION_ERROR", "execution.traceId");
     }
 
     private JsonNode taskProfile(JsonNode profiles, String taskType) {
@@ -217,6 +276,7 @@ class RunApiIntegrationTest {
                 "\"scenarioKey\":\"excessive-document-summary\"",
                 "\"runCreated\":true",
                 "\"analysisCreated\":true",
+                "\"source\":\"DEMO\"",
                 "\"classification\":\"HIGHLY_DISPROPORTIONATE\"",
                 "\"TOKEN_BUDGET_EXCEEDED\"",
                 "\"estimatedCostReductionUsd\":1.5900"
@@ -343,6 +403,23 @@ class RunApiIntegrationTest {
         return objectMapper.readTree(response.getBody());
     }
 
+    private void assertExtendedMetadata(JsonNode run) {
+        assertThat(run.path("source").asText()).isEqualTo("API");
+        assertThat(run.path("workflow").path("key").asText()).isEqualTo("document-summary");
+        assertThat(run.path("workflow").path("version").asText()).isEqualTo("1.0.0");
+        assertThat(run.path("workflow").path("promptVersion").asText()).isEqualTo("1.0.0");
+        assertThat(run.path("input").path("sizeValue").asLong()).isEqualTo(1_684L);
+        assertThat(run.path("input").path("sizeUnit").asText()).isEqualTo("CHARACTERS");
+        assertThat(run.path("input").path("fingerprint").asText())
+            .isEqualTo("a7c6f8d920b3415e6f708192a3b4c5d6e7f8091a2b3c4d5e6f708192a3b4c5d6");
+        assertThat(run.path("execution").path("traceId").asText())
+            .isEqualTo("3011b85749acd48e3fe1e2294493b18d");
+        assertThat(run.path("execution").path("outcomeStatus").asText())
+            .isEqualTo("NOT_EVALUATED");
+        assertThat(run.path("models").get(0).path("modelVersion").asText())
+            .isEqualTo("a80c4f17acd5");
+    }
+
     private HttpEntity<String> jsonEntity(String json) {
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
@@ -449,6 +526,73 @@ class RunApiIntegrationTest {
                 "environment": "local",
                 "team": "demo",
                 "purpose": "technical-document-summary"
+              }
+            }
+            """.formatted(idempotencyKey);
+    }
+
+    private String instrumentedRunJson(String idempotencyKey) {
+        return """
+            {
+              "externalRunId": "agent-run-2026-10-18-001",
+              "idempotencyKey": "%s",
+              "agent": {
+                "name": "meden-local-agent",
+                "version": "0.1.0"
+              },
+              "workflow": {
+                "key": "document-summary",
+                "version": "1.0.0",
+                "promptVersion": "1.0.0"
+              },
+              "task": {
+                "type": "DOCUMENT_SUMMARY",
+                "description": "Summarize a controlled local document fixture",
+                "complexity": "MEDIUM"
+              },
+              "input": {
+                "sizeValue": 1684,
+                "sizeUnit": "CHARACTERS",
+                "fingerprint": "a7c6f8d920b3415e6f708192a3b4c5d6e7f8091a2b3c4d5e6f708192a3b4c5d6"
+              },
+              "execution": {
+                "status": "SUCCESS",
+                "traceId": "3011b85749acd48e3fe1e2294493b18d",
+                "outcomeStatus": "NOT_EVALUATED",
+                "startedAt": "2026-10-17T07:36:57.471Z",
+                "completedAt": "2026-10-17T07:37:45.823Z",
+                "durationMs": 48351,
+                "modelCalls": 2,
+                "toolCalls": 1,
+                "retryCount": 0,
+                "subAgentCount": 0,
+                "inputTokens": 959,
+                "outputTokens": 398,
+                "estimatedCostUsd": 0
+              },
+              "models": [
+                {
+                  "provider": "ollama",
+                  "model": "llama3.2:3b",
+                  "modelVersion": "a80c4f17acd5",
+                  "callCount": 2,
+                  "inputTokens": 959,
+                  "outputTokens": 398,
+                  "estimatedCostUsd": 0
+                }
+              ],
+              "tools": [
+                {
+                  "name": "read_document",
+                  "callCount": 1,
+                  "successCount": 1,
+                  "failureCount": 0
+                }
+              ],
+              "metadata": {
+                "environment": "local",
+                "team": "portfolio",
+                "purpose": "instrumented-document-summary"
               }
             }
             """.formatted(idempotencyKey);

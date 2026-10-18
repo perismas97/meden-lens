@@ -21,6 +21,8 @@ class RunRequestValidatorTest {
     void rejectsCompletedAtBeforeStartedAt() {
         CreateRunRequest request = validRequest(new CreateRunRequest.ExecutionRequest(
             ExecutionStatus.SUCCESS,
+            null,
+            null,
             Instant.parse("2026-08-05T08:00:42Z"),
             Instant.parse("2026-08-05T08:00:00Z"),
             42000L,
@@ -43,6 +45,8 @@ class RunRequestValidatorTest {
     void rejectsTotalTokensThatDoNotMatchInputPlusOutput() {
         CreateRunRequest request = validRequest(new CreateRunRequest.ExecutionRequest(
             ExecutionStatus.SUCCESS,
+            null,
+            null,
             Instant.parse("2026-08-05T08:00:00Z"),
             Instant.parse("2026-08-05T08:00:42Z"),
             42000L,
@@ -80,11 +84,13 @@ class RunRequestValidatorTest {
             "run-external-001",
             "document-summary-001",
             new CreateRunRequest.AgentRequest("support-document-agent", "1.0.0"),
+            null,
             new CreateRunRequest.TaskRequest(
                 TaskType.DOCUMENT_SUMMARY,
                 "Summarize a 15-page technical support document",
                 Complexity.MEDIUM
             ),
+            null,
             execution,
             List.of(),
             tools,
@@ -95,6 +101,8 @@ class RunRequestValidatorTest {
     private CreateRunRequest.ExecutionRequest validExecution() {
         return new CreateRunRequest.ExecutionRequest(
             ExecutionStatus.SUCCESS,
+            null,
+            null,
             Instant.parse("2026-08-05T08:00:00Z"),
             Instant.parse("2026-08-05T08:00:42Z"),
             42000L,
