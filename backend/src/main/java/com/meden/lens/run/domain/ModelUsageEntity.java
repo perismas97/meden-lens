@@ -31,6 +31,9 @@ public class ModelUsageEntity {
     @Column(name = "model", nullable = false)
     private String modelName;
 
+    @Column(name = "model_version")
+    private String modelVersion;
+
     @Column(name = "call_count", nullable = false)
     private int callCount;
 
@@ -49,6 +52,7 @@ public class ModelUsageEntity {
     public ModelUsageEntity(
         String provider,
         String modelName,
+        String modelVersion,
         int callCount,
         long inputTokens,
         long outputTokens,
@@ -56,6 +60,7 @@ public class ModelUsageEntity {
     ) {
         this.provider = provider;
         this.modelName = modelName;
+        this.modelVersion = modelVersion;
         this.callCount = callCount;
         this.inputTokens = inputTokens;
         this.outputTokens = outputTokens;
@@ -76,6 +81,10 @@ public class ModelUsageEntity {
 
     public String getModelName() {
         return modelName;
+    }
+
+    public String getModelVersion() {
+        return modelVersion;
     }
 
     public int getCallCount() {

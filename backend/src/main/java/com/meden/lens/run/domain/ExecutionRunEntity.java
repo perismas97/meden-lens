@@ -35,11 +35,24 @@ public class ExecutionRunEntity {
     @Column(name = "idempotency_key", nullable = false, unique = true)
     private String idempotencyKey;
 
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
+    private RunSource source;
+
     @Column(name = "agent_name", nullable = false)
     private String agentName;
 
     @Column(name = "agent_version", nullable = false)
     private String agentVersion;
+
+    @Column(name = "workflow_key")
+    private String workflowKey;
+
+    @Column(name = "workflow_version")
+    private String workflowVersion;
+
+    @Column(name = "prompt_version")
+    private String promptVersion;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "task_type", nullable = false)
@@ -52,9 +65,26 @@ public class ExecutionRunEntity {
     @Column(name = "task_complexity", nullable = false)
     private Complexity taskComplexity;
 
+    @Column(name = "input_size_value")
+    private Long inputSizeValue;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "input_size_unit")
+    private InputSizeUnit inputSizeUnit;
+
+    @Column(name = "input_fingerprint")
+    private String inputFingerprint;
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     private ExecutionStatus status;
+
+    @Column(name = "trace_id")
+    private String traceId;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "outcome_status", nullable = false)
+    private OutcomeStatus outcomeStatus;
 
     @Column(name = "started_at", nullable = false)
     private Instant startedAt;
@@ -110,12 +140,21 @@ public class ExecutionRunEntity {
     public ExecutionRunEntity(
         String externalRunId,
         String idempotencyKey,
+        RunSource source,
         String agentName,
         String agentVersion,
+        String workflowKey,
+        String workflowVersion,
+        String promptVersion,
         TaskType taskType,
         String taskDescription,
         Complexity taskComplexity,
+        Long inputSizeValue,
+        InputSizeUnit inputSizeUnit,
+        String inputFingerprint,
         ExecutionStatus status,
+        String traceId,
+        OutcomeStatus outcomeStatus,
         Instant startedAt,
         Instant completedAt,
         long durationMs,
@@ -133,12 +172,21 @@ public class ExecutionRunEntity {
     ) {
         this.externalRunId = externalRunId;
         this.idempotencyKey = idempotencyKey;
+        this.source = source;
         this.agentName = agentName;
         this.agentVersion = agentVersion;
+        this.workflowKey = workflowKey;
+        this.workflowVersion = workflowVersion;
+        this.promptVersion = promptVersion;
         this.taskType = taskType;
         this.taskDescription = taskDescription;
         this.taskComplexity = taskComplexity;
+        this.inputSizeValue = inputSizeValue;
+        this.inputSizeUnit = inputSizeUnit;
+        this.inputFingerprint = inputFingerprint;
         this.status = status;
+        this.traceId = traceId;
+        this.outcomeStatus = outcomeStatus;
         this.startedAt = startedAt;
         this.completedAt = completedAt;
         this.durationMs = durationMs;
@@ -182,12 +230,28 @@ public class ExecutionRunEntity {
         return idempotencyKey;
     }
 
+    public RunSource getSource() {
+        return source;
+    }
+
     public String getAgentName() {
         return agentName;
     }
 
     public String getAgentVersion() {
         return agentVersion;
+    }
+
+    public String getWorkflowKey() {
+        return workflowKey;
+    }
+
+    public String getWorkflowVersion() {
+        return workflowVersion;
+    }
+
+    public String getPromptVersion() {
+        return promptVersion;
     }
 
     public TaskType getTaskType() {
@@ -202,8 +266,28 @@ public class ExecutionRunEntity {
         return taskComplexity;
     }
 
+    public Long getInputSizeValue() {
+        return inputSizeValue;
+    }
+
+    public InputSizeUnit getInputSizeUnit() {
+        return inputSizeUnit;
+    }
+
+    public String getInputFingerprint() {
+        return inputFingerprint;
+    }
+
     public ExecutionStatus getStatus() {
         return status;
+    }
+
+    public String getTraceId() {
+        return traceId;
+    }
+
+    public OutcomeStatus getOutcomeStatus() {
+        return outcomeStatus;
     }
 
     public Instant getStartedAt() {

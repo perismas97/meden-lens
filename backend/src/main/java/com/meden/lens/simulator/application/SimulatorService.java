@@ -41,7 +41,7 @@ public class SimulatorService {
             .orElseThrow(() -> new ResourceNotFoundException("Simulator scenario was not found."));
 
         CreateRunRequest request = scenarioCatalog.createRequest(scenario.key());
-        RunResponse run = runService.createRun(request, null);
+        RunResponse run = runService.createDemoRun(request);
         AnalysisResult analysis = analysisService.analyze(run.id());
 
         return new SimulatedRunResponse(

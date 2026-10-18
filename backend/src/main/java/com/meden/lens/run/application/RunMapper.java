@@ -6,6 +6,8 @@ import com.meden.lens.run.api.RunListItemResponse;
 import com.meden.lens.run.api.RunResponse;
 import com.meden.lens.run.domain.ExecutionRunEntity;
 import com.meden.lens.run.domain.ModelUsageEntity;
+import com.meden.lens.run.domain.OutcomeStatus;
+import com.meden.lens.run.domain.RunSource;
 import com.meden.lens.run.domain.ToolUsageEntity;
 import org.springframework.stereotype.Component;
 
@@ -14,9 +16,15 @@ import java.util.List;
 @Component
 public class RunMapper {
 
-    public ExecutionRunEntity toEntity(CreateRunRequest request, String idempotencyKey) {
+    public ExecutionRunEntity toEntity(
+        CreateRunRequest request,
+        String idempotencyKey,
+        RunSource source
+    ) {
         CreateRunRequest.ExecutionRequest execution = request.execution();
         CreateRunRequest.MetadataRequest metadata = request.metadata();
+        CreateRunRequest.WorkflowRequest workflow = request.workflow();
+        CreateRunRequest.InputRequest input = request.input();
         long totalTokens = execution.totalTokens() == null
             ? execution.inputTokens() + execution.outputTokens()
             : execution.totalTokens();
@@ -24,12 +32,23 @@ public class RunMapper {
         ExecutionRunEntity entity = new ExecutionRunEntity(
             request.externalRunId(),
             idempotencyKey,
+            source,
             request.agent().name(),
             request.agent().version(),
+            workflow == null ? null : workflow.key(),
+            workflow == null ? null : workflow.version(),
+            workflow == null ? null : workflow.promptVersion(),
             request.task().type(),
             request.task().description(),
             request.task().complexity(),
+            input == null ? null : input.sizeValue(),
+            input == null ? null : input.sizeUnit(),
+            input == null ? null : input.fingerprint(),
             execution.status(),
+            execution.traceId(),
+            execution.outcomeStatus() == null
+                ? OutcomeStatus.NOT_EVALUATED
+                : execution.outcomeStatus(),
             execution.startedAt(),
             execution.completedAt(),
             execution.durationMs(),
@@ -50,6 +69,7 @@ public class RunMapper {
         models.forEach(model -> entity.addModelUsage(new ModelUsageEntity(
             model.provider(),
             model.model(),
+            model.modelVersion(),
             model.callCount(),
             model.inputTokens(),
             model.outputTokens(),
@@ -73,10 +93,15 @@ public class RunMapper {
             entity.getExternalRunId(),
             entity.getIdempotencyKey(),
             previouslyProcessed,
+            entity.getSource(),
             new RunResponse.AgentResponse(entity.getAgentName(), entity.getAgentVersion()),
+            toWorkflowResponse(entity),
             new RunResponse.TaskResponse(entity.getTaskType(), entity.getTaskDescription(), entity.getTaskComplexity()),
+            toInputResponse(entity),
             new RunResponse.ExecutionResponse(
                 entity.getStatus(),
+                entity.getTraceId(),
+                entity.getOutcomeStatus(),
                 entity.getStartedAt(),
                 entity.getCompletedAt(),
                 entity.getDurationMs(),
@@ -106,10 +131,15 @@ public class RunMapper {
         return new RunListItemResponse(
             entity.getId(),
             entity.getExternalRunId(),
+            entity.getSource(),
             new RunResponse.AgentResponse(entity.getAgentName(), entity.getAgentVersion()),
+            toWorkflowResponse(entity),
             new RunResponse.TaskResponse(entity.getTaskType(), entity.getTaskDescription(), entity.getTaskComplexity()),
+            toInputOverviewResponse(entity),
             new RunResponse.ExecutionResponse(
                 entity.getStatus(),
+                entity.getTraceId(),
+                entity.getOutcomeStatus(),
                 entity.getStartedAt(),
                 entity.getCompletedAt(),
                 entity.getDurationMs(),
@@ -145,6 +175,7 @@ public class RunMapper {
         return new RunResponse.ModelUsageResponse(
             entity.getProvider(),
             entity.getModelName(),
+            entity.getModelVersion(),
             entity.getCallCount(),
             entity.getInputTokens(),
             entity.getOutputTokens(),
@@ -158,6 +189,43 @@ public class RunMapper {
             entity.getCallCount(),
             entity.getSuccessCount(),
             entity.getFailureCount()
+        );
+    }
+
+    private RunResponse.WorkflowResponse toWorkflowResponse(ExecutionRunEntity entity) {
+        if (entity.getWorkflowKey() == null) {
+            return null;
+        }
+
+        return new RunResponse.WorkflowResponse(
+            entity.getWorkflowKey(),
+            entity.getWorkflowVersion(),
+            entity.getPromptVersion()
+        );
+    }
+
+    private RunResponse.InputResponse toInputResponse(ExecutionRunEntity entity) {
+        if (entity.getInputSizeValue() == null) {
+            return null;
+        }
+
+        return new RunResponse.InputResponse(
+            entity.getInputSizeValue(),
+            entity.getInputSizeUnit(),
+            entity.getInputFingerprint()
+        );
+    }
+
+    private RunListItemResponse.InputOverviewResponse toInputOverviewResponse(
+        ExecutionRunEntity entity
+    ) {
+        if (entity.getInputSizeValue() == null) {
+            return null;
+        }
+
+        return new RunListItemResponse.InputOverviewResponse(
+            entity.getInputSizeValue(),
+            entity.getInputSizeUnit()
         );
     }
 }

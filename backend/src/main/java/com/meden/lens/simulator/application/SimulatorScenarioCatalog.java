@@ -74,11 +74,13 @@ public class SimulatorScenarioCatalog {
             "sim-proportional-document-summary-" + runSuffix,
             "sim-proportional-document-summary-" + runSuffix,
             agent("support-document-agent"),
+            null,
             task(
                 TaskType.DOCUMENT_SUMMARY,
                 "Summarize a 15-page technical support document",
                 Complexity.MEDIUM
             ),
+            null,
             execution(ExecutionStatus.SUCCESS, "2026-08-07T08:00:00Z", "2026-08-07T08:00:15Z", 15000L, 1, 1, 0, 0, 10000L, 2500L, "0.1800"),
             List.of(model("efficient-summary-model", 1, 10000L, 2500L, "0.1800")),
             List.of(tool("document-reader", 1, 1, 0)),
@@ -91,11 +93,13 @@ public class SimulatorScenarioCatalog {
             "sim-excessive-document-summary-" + runSuffix,
             "sim-excessive-document-summary-" + runSuffix,
             agent("support-document-agent"),
+            null,
             task(
                 TaskType.DOCUMENT_SUMMARY,
                 "Summarize a 15-page technical support document",
                 Complexity.MEDIUM
             ),
+            null,
             execution(ExecutionStatus.SUCCESS, "2026-08-07T08:00:00Z", "2026-08-07T08:00:42Z", 42000L, 6, 12, 2, 0, 48000L, 9000L, "1.8400"),
             List.of(model("large-reasoning-model", 6, 48000L, 9000L, "1.8400")),
             List.of(tool("web-search", 12, 12, 0)),
@@ -108,11 +112,13 @@ public class SimulatorScenarioCatalog {
             "sim-failed-high-cost-run-" + runSuffix,
             "sim-failed-high-cost-run-" + runSuffix,
             agent("support-document-agent"),
+            null,
             task(
                 TaskType.DOCUMENT_SUMMARY,
                 "Summarize a technical support document but fail after retries",
                 Complexity.MEDIUM
             ),
+            null,
             execution(ExecutionStatus.FAILED, "2026-08-07T08:00:00Z", "2026-08-07T08:01:00Z", 60000L, 4, 3, 3, 0, 16000L, 4000L, "0.9500"),
             List.of(model("large-reasoning-model", 4, 16000L, 4000L, "0.9500")),
             List.of(
@@ -128,11 +134,13 @@ public class SimulatorScenarioCatalog {
             "sim-valid-deep-research-" + runSuffix,
             "sim-valid-deep-research-" + runSuffix,
             agent("research-agent"),
+            null,
             task(
                 TaskType.DEEP_RESEARCH,
                 "Research a technical market and produce a structured report",
                 Complexity.HIGH
             ),
+            null,
             execution(ExecutionStatus.SUCCESS, "2026-08-07T08:00:00Z", "2026-08-07T08:02:30Z", 150000L, 8, 24, 2, 2, 72000L, 18000L, "2.5000"),
             List.of(model("large-research-model", 8, 72000L, 18000L, "2.5000")),
             List.of(
@@ -166,6 +174,8 @@ public class SimulatorScenarioCatalog {
     ) {
         return new CreateRunRequest.ExecutionRequest(
             status,
+            null,
+            null,
             Instant.parse(startedAt),
             Instant.parse(completedAt),
             durationMs,
@@ -190,6 +200,7 @@ public class SimulatorScenarioCatalog {
         return new CreateRunRequest.ModelUsageRequest(
             "sample-provider",
             model,
+            null,
             callCount,
             inputTokens,
             outputTokens,
